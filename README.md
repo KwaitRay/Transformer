@@ -559,6 +559,49 @@ plot.show()
   
 ![decoder_self_attention_weights](decoder_self_attention_weights.png)
 #### 3.测试结果展示(bleu)
+载入部分英文句子进行模型测试，并展示预测结果，通过机器翻译领域常用自动化评估指标BLEU进行评估(Bilingual Evaluation Understudy),该指标
+- 计算机器翻译生成的文本与一个或多个参考翻译文本之间的n-gram匹配程度
+- 通过对多个长度的n-gram进行加权平均，衡量翻译质量
+- 引入惩罚机制(brevity penalty,BP),避免模型通过简单的复制参考文本的短片段来获得高分
+  模型公式如下
+  
+#### BLEU 计算公式
+
+1. **总体公式**：
+   
+$$
+\text{BLEU} = \text{BP} \cdot \exp\left(\sum_{n=1}^N w_n \cdot \log p_n\right)
+$$
+
+$ \text{BP} $: Brevity Penalty（长度惩罚因子）。
+
+N: 最大的 n-gram 长度。
+
+w_n: 第 $n$-gram 的权重，通常为 
+
+w_n = \frac{1}{N}$
+
+p_n : 第 $n$-gram 的精确度，定义为：
+
+  
+$$
+p_n = \frac{\text{匹配的 n-gram 个数}}{\text{生成翻译的 n-gram 总数}}
+$$
+
+2. **长度惩罚因子（BP）**：
+
+$$
+\text{BP} =
+\begin{cases} 
+1 & \text{如果 } c > r \\
+\exp(1 - \frac{r}{c}) & \text{如果 } c \leq r
+\end{cases}
+$$
+
+$ c $: 生成翻译的长度（candidate length）。
+
+$ r $: 参考翻译的长度（reference length）。
+
 
 loss 0.029, 5164.5 tokens/sec on cuda:0
 | original sentence => target sentence       | bleu       | 
