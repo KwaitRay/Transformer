@@ -13,10 +13,6 @@ This project is designed to explore the attention mechanism and how to build an 
 #### 训练工具：GPU（CUDA 支持）。
 #### 代码管理：Git、VS Code。
 #### 评估与可视化：自定义的 Animator 类，show_heatmaps函数
-详细记录背景和假设：确保对项目的背景、目标和假设做详细清晰的说明，帮助他人理解你的工作。
-清晰描述方法和过程：对于方法论和实验步骤，要描述清晰，确保别人能够根据你的描述理解每一个关键的步骤，包括算法原理、数据处理流程、模型设计等。
-提供充分的实验验证：如果项目包含实验，确保数据集、实验设置、评估指标等都描述明确，并且提供必要的结果支持，避免模糊不清的结果或解释。
-使用清晰的语言和格式：避免过于复杂的语言和专业术语，尽量使用简洁明了的表达，使得描述可以被广泛理解。适当时可以配合图表、公式等辅助说明。
 ## 二.Transformer模型结构和原理
 ### 1.模型结构
 - Transformer模型是基于注意力机制的深度学习模型，模型分成编码器和解码器两大模块，编码器模块由多个相同的层来组成，每个层都有两个子层。第一个子层是多头自注意力汇聚；第二个子层是基于位置的前馈网络。具体来说，在计算编码器的自注意力时，查询、键和值都来自前一个编码器层的输出。每个子层都采用了残差连接加法计算，然后再应用层规范化。
@@ -573,15 +569,17 @@ $$
 \text{BLEU} = \text{BP} \cdot \exp\left(\sum_{n=1}^N w_n \cdot \log p_n\right)
 $$
 
-$ \text{BP} $: Brevity Penalty（长度惩罚因子）。
+$ \text{BP} $
+
+: Brevity Penalty（长度惩罚因子）。
 
 N: 最大的 n-gram 长度。
 
-w_n: 第 $n$-gram 的权重，通常为 
+w_n: 第 n-gram 的权重，通常为 
 
 w_n = \frac{1}{N}$
 
-p_n : 第 $n$-gram 的精确度，定义为：
+p_n : 第n-gram 的精确度，定义为：
 
   
 $$
@@ -598,9 +596,9 @@ $$
 \end{cases}
 $$
 
-$ c $: 生成翻译的长度（candidate length）。
+c: 生成翻译的长度（candidate length）。
 
-$ r $: 参考翻译的长度（reference length）。
+r: 参考翻译的长度（reference length）。
 
 
 loss 0.029, 5164.5 tokens/sec on cuda:0
