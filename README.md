@@ -497,9 +497,49 @@ net = d2l.EncoderDecoder(encoder, decoder)
 d2l.train_seq2seq(net, train_iter, lr, num_epochs, tgt_vocab, device)
 ```
 ## 五.实验与结果分析 (Experiments and Results)
-### 1.损失曲线
+### 1.检测实验设计
+#### (1)设计目的
+#### (2)测试代码
+```python
+#根据训练好的模型，选取英语法语句子进行测试，根据模型进行预测
+#如果传入的字符串中包含',需要用\表示这是字符串的一部分，而不是字符串结尾
+engs = ['go .', 'i lost .', 'he\'s calm .', 'I\'m home .']
+fras = ['va !', 'j\'ai perdu .', 'il est calme .', 'je suis chez moi .']
+for eng, fra in zip(engs,fras):
+    #利用d2l.predict_seq2seq来获取翻译结果以及解码器权重序列，然后打印翻译情况以及BELU结果，用于评估翻译效果，k=2表示参考两个词的组合的准确性
+    translation,dec_attention_weight_seq = d2l.predict_seq2seq(net,eng,src_vocab,tgt_vocab,num_steps,device,True)
+    print(f'{eng}=>{translation}, ',f'bleu {d2l.bleu(translation,fra,k=2):.3f}')
+
+#获取编码器自注意力权重，并进行可视化
+#enc_attention_weights
+enc_attention_weights = torch.cat(net.encoder.attention_weights,0).reshape((num_layers, num_heads, -1, num_steps))
+d2l.show_heatmaps(enc_attention_weights.cpu(),xlabel='Key positions', ylabel='Query positions', titles=['Head %d'%i for i in range(1,5)],
+                  figsize=(7, 3.5))
+
+#分别获取解码器的自注意力权重以及编码-解码器注意力权重
+#dec_attention_weights_2d, step, dec_attention_weight_seq, attn, blk, head, dec_attention_weights_filled, dec_attention_weights
+#dec_self_attention_weights, dec_inter_attention_weights
+dec_attention_weights_2d = [head[0].tolist() for step in dec_attention_weight_seq 
+                            for attn in step 
+                            for blk in attn 
+                            for head in blk]
+dec_attention_weights_filled = torch.tensor(pd.DataFrame(dec_attention_weights_2d).fillna(0.0).values)
+dec_attention_weights = dec_attention_weights_filled.reshape((-1, 2, num_layers, num_heads, num_steps))
+#进行解包赋值，分别提取重排后第 0 维上的两个部分：dec_self_attention_weights: 自注意力权重。dec_inter_attention_weights: 交互注意力权重
+dec_self_attention_weights, dec_inter_attention_weights = dec_attention_weights.permute(1, 2, 3, 0, 4)
+#绘制热力图
+d2l.show_heatmaps(dec_self_attention_weights, xlabel='Key positions', ylabel='Query positions', 
+                  titles=['head %d'%i for i in range(1,5)], figsize=(7.5, 3))
+d2l.show_heatmaps(dec_inter_attention_weights, xlabel='Key positions', ylabel='Query positions', 
+                  titles=['head %d'%i for i in range(1,5)], figsize=(7.5, 3))
+plot.show()
+```
+### 2.结果分析
+#### (1).损失曲线
+通过训练模块d2l.train_seq2seq()中的animator模块，实时跟踪模型训练过程中损失函数的变化情况，并根据变化情况进行更新，绘制图像
+
 ![loss_function_curve](loss_function_curve.png)
-### 2.注意力权重热力图
+#### (2).注意力权重热力图
 - 编码器自注意力权重
 
 ![encoder_attention_weights](encoder_attention_weights.png)
@@ -511,7 +551,7 @@ d2l.train_seq2seq(net, train_iter, lr, num_epochs, tgt_vocab, device)
 - 编码器解码器注意力权重
   
 ![decoder_self_attention_weights](decoder_self_attention_weights.png)
-### 3.测试结果展示(bleu)
+#### 3.测试结果展示(bleu)
 
 loss 0.029, 5164.5 tokens/sec on cuda:0
 | original sentence => target sentence       | bleu       | 
