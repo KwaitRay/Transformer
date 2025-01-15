@@ -12,7 +12,7 @@ This project is designed to explore the attention mechanism and how to build an 
 #### Training Tools：GPU（CUDA Support）。
 #### Code Management：Git、VS Code。
 #### Evaluation and Visualization：Custom Animator Class，show_heatmap Function
-## 二.Transformer Model Architecture and Principles
+## Chapter 2.Transformer Model Architecture and Principles
 ### 1.Model Architecture
 - The Transformer model is a deep learning architecture based on the attention mechanism, divided into two main modules: the encoder and the decoder. The encoder module consists of multiple identical layers, with each layer containing two sub-layers. The first sub-layer is multi-head self-attention aggregation, and the second sub-layer is a position-wise feed-forward network. Specifically, when calculating the self-attention in the encoder, the queries, keys, and values all come from the output of the previous encoder layer. Each sub-layer uses residual connections followed by layer normalization.
 - The Transformer decoder is also composed of multiple identical layers stacked together, and residual connections and layer normalization are used in each layer. The decoder layer consists of three sub-layers. The first sub-layer is a masked multi-head self-attention layer, where all inputs depend on the output of the previous decoder layer. Queries, keys, and values all come from the output of the previous decoder layer. In the decoder, each position can only attend to all positions before it. This masking attention retains the auto-regressive property, ensuring that predictions depend only on the previously generated output tokens. The implementation of masked attention is similar to the hidden state implementation in RNNs, where a hidden state is introduced in the forward pass of the module. The second sub-layer is the encoder-decoder attention layer. In encoder-decoder attention, the queries come from the output of the previous decoder layer, while the keys and values come from the entire output of the encoder. The final sub-layer is a position-wise feed-forward network.
@@ -34,8 +34,8 @@ $$
 \text{Attention}(Q, K, V) = \text{softmax}\left(\frac{QK^T}{\sqrt{d_k}}\right)V
 $$
 
-#### （2）多头注意力（Multi-Head Attention）
-多头注意力机制通过多个“头”并行计算自注意力，每个头在不同的子空间上学习不同的注意力模式，最终将这些头的输出拼接起来。从而可以学习输入序列不同的语义信息，提高模型表现。每个头计算注意力权重一般也是采用点积注意力
+#### （2）Multi-Head Attention
+The multi-head attention mechanism calculates self-attention in parallel across multiple "heads." Each head learns different attention patterns in different subspaces, and the outputs of these heads are concatenated together. This allows the model to capture different semantic information from the input sequence, improving model performance. The attention weights for each head are generally computed using dot-product attention.
 
 $$
 \text{MultiHead}(Q, K, V) = \text{Concat}(\text{head}_1, \dots, \text{head}_h)W^O
@@ -48,10 +48,10 @@ $$
 ![attention_scoring_function](attention_scoring_function.png)
 ![multi_attention](multi_attention.png)
 
-#### （3）位置编码（Positional Encoding）
-由于transformer不像RNN,CNN具有顺序处理能力，因此引入了位置编码，位置编码是一个与输入序列长度相同的向量，它加入到输入嵌入（embedding）中，可以帮助模型捕捉词语在序列中的位置。本项目中通过正弦余弦函数生成位置编码，从而注入绝对或是相对位置
-## 三.技术细节
-### （1）包导入
+#### （3）Positional Encoding
+Since transformers, unlike RNNs and CNNs, do not have inherent sequential processing capabilities, positional encoding is introduced. Positional encoding is a vector that has the same length as the input sequence and is added to the input embeddings. It helps the model capture the position of words in the sequence. In this project, positional encoding is generated using sine and cosine functions, thereby injecting absolute or relative positions.
+## Chapter 3.Technical Details
+### （1）Package Import
 ```python
 import random
 import torch
@@ -64,8 +64,7 @@ import math
 import os
 os.environ["KMP_DUPLICATE_LIB_OK"] = 'TRUE'
 ```
-描述模块的设计动机、理论支撑和高层逻辑。
-示例：多头注意力机制为什么能够提升模型效果？
+
 ### （2）训练数据集预处理
 训练数据集加载与预处理是模型数据的重要基础，在d2l库内部封装的d2l.load_data_nmt()的内部实现中，就包括了从最开始的连接d2l数据中心DATAHUB,获取训练文档'fra-eng'对应的url,检测本地是否存在相关文件，不存在就通过request模利用url发送http请求并响应，将数据集加载到本地，通过with-open打开，然后针对文本进行预处理，包括在前一位不为空的标点符号前添加空格，字母替换成小写，替换文本中的非破坏性空格等规范化操作，将处理后的文本序列进行分词(tokenize)，然后通过Vocab模块构建token_to_idx,idx_to_token的词元索引间转化表，这是将文本数据集数据规范化导入模型的关键操作。之后可以采用顺序分区，可以保留上下文之间的依赖关系，或是采用随机分区，提高模型泛化程。最后利用torch的utils模块，使用torch.utils.data.DataLoader来创建迭代器，具体实现可以参考d2l库对应源码，以下是读取和规范化处理的部分操作
 ```python
