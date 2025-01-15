@@ -579,6 +579,7 @@ d2l.train_seq2seq(net, train_iter, lr, num_epochs, tgt_vocab, device)
 ## 五.实验与结果分析 (Experiments and Results)
 ### 1.检测实验设计
 #### (1)设计目的
+本实验利用d2l数据中心DATAHUB的'fra-eng'文本数据作为训练数据集，经过预处理载入设计好的transformer模型中进行训练，通过进行参数微调，观察损失函数变化曲线以及测试结果，确定超参数，最终实现可靠的翻译效果。本次翻译模型的设计目的是构建一个高效、准确的翻译工具，以解决跨语言交流，主要是英语法语翻译交流。通过结合目前较为流行的transformer模型，捕捉源语言间多层次，复杂的语义特征，还能生成流畅自然的目标语言翻译，满足使用者在多场景中进行翻译的需求。
 #### (2)测试代码
 ```python
 #根据训练好的模型，选取英语法语句子进行测试，根据模型进行预测
@@ -704,4 +705,9 @@ loss 0.029, 5164.5 tokens/sec on cuda:0
 ### .参数列表匹配
 在transformer模型中，query_size,key_size,value_size,num_hiddens在行业中大多设置为一致的形式，因此很多时候可以只用num_hiddens进行替代
 ## 七.参考代码
-- [attention_cues](attention_cues.py) 注意力热力图绘制功能实现
+内部包括各模块的具体实现以及测试用例
+- [attention_cues](attention_cues.py) 注意力热力图绘制功能以及nadaraya_watson_regression核回归实现
+- [attention_scoring_function](attention_scoring_function.py) 注意力权重函数实现，包括加性注意力和点积注意力
+- [bahdanau_attention](bahdanau_attention.py) 实现，是一种简单的序列到序列模型，设计了一个基于两个循环神经网络的编码器-解码器架构
+- [multi_and_self_attention](multi_and_self_attention.py) 多头注意力机制以及自注意力机制实现
+- [transformer](transformer.py) 模型实现
