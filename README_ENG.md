@@ -65,7 +65,7 @@ import os
 os.environ["KMP_DUPLICATE_LIB_OK"] = 'TRUE'
 ```
 
-### （2）训练数据集预处理
+### （2）Training Data Preprocessing
 The training dataset loading and preprocessing is a critical foundation for the model's data. In the internal implementation of d2l.load_data_nmt() in the d2l library, it includes connecting to the d2l data center (DATAHUB) to retrieve the URL corresponding to the 'fra-eng' training document, checking whether the related files exist locally. If not, it sends an HTTP request using the URL through request and responds by downloading the dataset to the local machine. The dataset is then loaded using with open.
 
 Next, the text is preprocessed, which includes operations such as adding spaces before non-empty punctuation marks, converting letters to lowercase, and replacing non-breaking spaces with regular spaces for text normalization. After that, the text sequences are tokenized. Then, using the Vocab module, token-to-index and index-to-token mappings are built, which is a key operation for normalizing the text dataset before feeding it into the model.
@@ -151,14 +151,14 @@ The sequence-to-sequence training process can be divided into the following step
 - Performing forward propagation and loss calculation (comparing the predicted values from forward propagation with the true labels).
 - Calculating the loss, performing backpropagation to ensure the loss is a scalar, clipping the gradients, and updating model parameters. Loss accumulation and token accumulation are done without updating gradients.
 - Finally, updating the animator every ten epochs to plot the loss graph.
-## 四.关键代码段实现
-### （1）训练数据集预处理
-使用d2l库中封装好的函数d2l.load_data_nmt，内部实现主要包括链接到d2l数据中心DATA_HUB[]，返回所需文档的url,如果查询本地不存在该文件，利用流式传输下载到本地，然后进行解压，读取，预处理，包括替换文本中的非破坏性空格（'\u02f'和'\xa0'）,将所有字母替换为小写以及在前面没有空格的标点符号前插入空格，然后对文本进行分词，词元索引转化，利用torch.utils.data.DataLoade构建数据迭代器
+## Chapter 4.Training Dataset Preprocessing
+### （1）Training Dataset Preprocessing
+Using the function d2l.load_data_nmt from the d2l library, the internal implementation includes connecting to the d2l data center (DATA_HUB[]), retrieving the URL of the required document. If the file is not found locally, it will be streamed and downloaded to the local machine. Afterward, the file is decompressed, read, and preprocessed, which includes replacing non-breaking spaces (\u02f and \xa0) in the text, converting all letters to lowercase, and adding spaces before punctuation marks that do not have spaces in front. The text is then tokenized, and the tokens are indexed and converted into a form that can be used by the model. Finally, a data iterator is created using torch.utils.data.DataLoader.
 ```python
 train_iter, src_vocab, tgt_vocab = d2l.load_data_nmt(batch_size,num_steps)
 ```
-以下是内部实现的关键代码
-#### <1>分词tokenize
+The following is the key code for internal implementation
+#### <1>Tokenize
 ```python
 def tokenize(lines,token='word'):
     if token=='word':
@@ -166,94 +166,98 @@ def tokenize(lines,token='word'):
     elif token=='char':
         return [list(line) for line in lines]
     else:
-        print('错误，未知词元类型:'+token)
+        print('Error: unknown token type:'+token)
 ```
-#### <2>vocab模块
+#### <2>Vocab
 ```python
-#将词元列表tokens转变为idx_to_token(初始索引-词元列表)，然后进一步转变为token_to_idx(词元-索引表)
-#利用collections.Counter(tokens)来得到_token_freqs列表，按照词频进行排序，降序排列
+# Convert token list `tokens` to idx_to_token (initial index-to-token list), and then further convert it to token_to_idx (token-to-index table).
+# Use collections.Counter(tokens) to get the _token_freq list, sorted in descending order by frequency.
 class Vocab:
-    #__xxx__特殊方法在使用实例化对象时会自动调用
-    def __init__(self,tokens=None,min_freq=0,reserved_token=None):
+    # Special methods like __xxx__ are automatically called when instances of the object are instantiated.
+    def __init__(self, tokens=None, min_freq=0, reserved_token=None):
         if tokens is None:
-            tokens=[]
+            tokens = []
         if reserved_token is None:
-            reserved_token=[]
-        #按照token的出现频率(key = lambda x:x[1])进行排序,降序排列(reverse=True)
+            reserved_token = []
+        # Sort tokens based on their frequency (key = lambda x: x[1]), in descending order (reverse=True).
         counter = count_corpus(tokens)
-        self._token_freq=sorted(counter.items(),key=lambda x : x[1] ,reverse=True)
-        #然后对idx_to_token列表（按索引顺序存储词元，以便将索引映射回具体词元）以及token_to_idx字典（按词元即键值，快速查找对应的索引)
-        #以此进行初始化，优先在idx_to_token中加入特殊token(reserved_token),比如<unk>表示词表中的未知词元，<pad>对序列进行填充，<bos><eos>序列的起始和结束标记
-        self.idx_to_token = ['<unk>']+reserved_token
-        #用idx_to_token来初始化token_to_idx,注意要用self.，表示是Vocab的实例的属性，便于之后进行访问与修改，保证了代码的封装性
-        self.token_to_idx = {token:idx for idx,token in enumerate(self.idx_to_token)}
-        #利用词频表更新idx_to_token,从而更新token_to_idx
-        for token,freq in self._token_freq:
-            if freq<min_freq:
+        self._token_freq = sorted(counter.items(), key=lambda x: x[1], reverse=True)
+        # Initialize idx_to_token list (storing tokens in index order, mapping index back to tokens) and token_to_idx dictionary (using tokens as keys, enabling fast lookup of indices).
+        # Special tokens (reserved_token), like <unk> for unknown tokens, <pad> for padding sequences, <bos> for the beginning of sequences, and <eos> for the end of sequences, are added first to idx_to_token.
+        self.idx_to_token = ['<unk>'] + reserved_token
+        # Initialize token_to_idx using idx_to_token, ensuring that it is an instance attribute (accessible and modifiable), for better encapsulation of the code.
+        self.token_to_idx = {token: idx for idx, token in enumerate(self.idx_to_token)}
+        # Update idx_to_token with the token frequency list and then update token_to_idx.
+        for token, freq in self._token_freq:
+            if freq < min_freq:
                 break
             if token not in self.token_to_idx:
                 self.idx_to_token.append(token)
-                self.token_to_idx[token]=len(self.idx_to_token)-1
+                self.token_to_idx[token] = len(self.idx_to_token) - 1
+
     def __len__(self):
         return len(self.idx_to_token)
-    #单个词元就直接用get获取该token对应的索引值，列表或者元组就对tokens中的每个token进行递归调用
-    def __getitem__(self,tokens):
-        if not isinstance(tokens,(list,tuple)):
-            #get是python内置的通过字典的键来获取值(即索引)的方法
-            return self.token_to_idx.get(tokens,self.unk )
+
+    # For a single token, directly use get to retrieve the corresponding index value. For a list or tuple, recursively call on each token in the list.
+    def __getitem__(self, tokens):
+        if not isinstance(tokens, (list, tuple)):
+            # get is a built-in Python method to retrieve values (i.e., indices) from a dictionary using the key.
+            return self.token_to_idx.get(tokens, self.unk)
         return [self.__getitem__(token) for token in tokens]
-    #将索引(indices)转换成对应的词元(token),为列表或者tuple也只要用self.idx_to_token(index)直接获取
-    def __totokens__(self,indices):
-        if not isinstance(indices,(list,tuple)):
+
+    # Convert indices to their corresponding tokens (words), even for lists or tuples, just use self.idx_to_token(index) to retrieve them.
+    def __totokens__(self, indices):
+        if not isinstance(indices, (list, tuple)):
             return self.idx_to_token[indices]
-        return [self.idx_to_token(index)for index in indices]
+        return [self.idx_to_token(index) for index in indices]
+
     @property
     def unk(self):
         return 0
+
     @property
     def token_freq(self):
         return self._token_freq
 
-#通过count_corpus()返回的是词元词频统计列表
+# The function count_corpus() returns a list of token frequency statistics.
 def count_corpus(tokens):
-    #如果tokens列表为空或tokens列表第一个元素是list,即tokens是二维列表，此时需要进行列表展开操作
-    if len(tokens)==0 or isinstance(tokens[0],list):
-        #tokens-line-token
+    # If the tokens list is empty or if the first element of tokens is a list (i.e., tokens is a 2D list), flatten it.
+    if len(tokens) == 0 or isinstance(tokens[0], list):
+        # tokens-line-token
         tokens = [token for line in tokens for token in line]
     return collections.Counter(tokens)
-
 ```
-#### <3>随机分区
+#### <3>Random Partition
 ```python
 def seq_data_iter_random(corpus, batch_size, num_steps):  #@save
-    #"""使用随机抽样生成一个小批量子序列"""
-    # 从随机偏移量开始对序列进行分区，随机范围包括num_steps-1
+    #"""Generate mini-batches of subsequences using random sampling"""
+    # Start partitioning the sequence from a random offset, where the random range includes num_steps-1
     corpus = corpus[random.randint(0, num_steps - 1):]
-    # 减去1，是因为我们需要考虑标签
+    # Subtract 1 because we need to account for the labels
     num_subseqs = (len(corpus) - 1) // num_steps
-    # 长度为num_steps的子序列的起始索引
+    # Initial indices for subsequences of length num_steps
     initial_indices = list(range(0, num_subseqs * num_steps, num_steps))
-    # 在随机抽样的迭代过程中，
-    # 来自两个相邻的、随机的、小批量中的子序列不一定在原始序列上相邻
+    # During the random sampling iteration,
+    # subsequences from two adjacent random mini-batches may not be adjacent in the original sequence
     random.shuffle(initial_indices)
 
     def data(pos):
-        # 返回从pos位置开始的长度为num_steps的序列
+        # Return a subsequence of length num_steps starting from position pos
         return corpus[pos: pos + num_steps]
 
     num_batches = num_subseqs // batch_size
     for i in range(0, batch_size * num_batches, batch_size):
-        # 在这里，initial_indices包含子序列的随机起始索引
+        # Here, initial_indices contains random starting indices for subsequences
         initial_indices_per_batch = initial_indices[i: i + batch_size]
         X = [data(j) for j in initial_indices_per_batch]
         Y = [data(j + 1) for j in initial_indices_per_batch]
         yield torch.tensor(X), torch.tensor(Y)
 ```
-#### <4>顺序分区
+#### <4>Sequential Partition
 ```python
 def seq_data_iter_sequential(corpus, batch_size, num_steps):  #@save
-    #"""使用顺序分区生成一个小批量子序列"""
-    # 从随机偏移量开始划分序列
+    #"""Generate mini-batches of subsequences using sequential partitioning"""
+    # Start partitioning the sequence from a random offset
     offset = random.randint(0, num_steps)
     num_tokens = ((len(corpus) - offset - 1) // batch_size) * batch_size
     Xs = torch.tensor(corpus[offset: offset + num_tokens])
@@ -265,7 +269,7 @@ def seq_data_iter_sequential(corpus, batch_size, num_steps):  #@save
         Y = Ys[:, i: i + num_steps]
         yield X, Y
 ```
-#### <5>迭代器加载
+#### <5>Iterator Loading
 ```python
 def load_array(data_arrays, batch_size, is_train=True):
     """Construct a PyTorch data iterator.
@@ -274,214 +278,249 @@ def load_array(data_arrays, batch_size, is_train=True):
     dataset = torch.utils.data.TensorDataset(*data_arrays)
     return torch.utils.data.DataLoader(dataset, batch_size, shuffle=is_train)
 ```
-### （2）注意力函数
-计算点积注意力以及加性注意力需要提前定义好掩蔽softmax操作，用于将超过有效长度的元素用一个非常大的负值代替，避免影响后续计算，同时处理好有效长度valid_lens的转化
+### （2）Attention Function
+In order to calculate dot-product attention and additive attention, it's essential to define a masked softmax operation. This operation ensures that elements beyond the valid length are replaced with a very large negative value to avoid influencing the subsequent computations. Additionally, we need to handle the transformation of the valid_lens to ensure it aligns with the input tensor's shape.
 ```python
-def masked_softmax(X,valid_lens):
+def masked_softmax(X, valid_lens):
     if valid_lens is None:
-        return nn.functional.softmax(X,dim=-1)
+        # If valid_lens is not provided, just apply the standard softmax operation
+        return nn.functional.softmax(X, dim=-1)
     else:
         shape = X.shape
-        #进行valid_lens维度变换，本质上是为了与输入张量X进行维度匹配
+        # Adjust valid_lens to match the dimensions of X
         if valid_lens.dim() == 1:
-            #当valid_lens是一维时，将其广播为二维，第二维的长度与X的第二维相匹配,比如[2,3]，假设shape[1]=2，每个样本有两个序列，对应每个序列[2,2,3,3]
-            valid_lens = torch.repeat_interleave(valid_lens,shape[1])
+            # If valid_lens is 1D, broadcast it to 2D, where the second dimension matches the length of the second dimension of X
+            # For example, given valid_lens=[2,3] and shape[1]=2, it repeats the valid_lens as [2,2,3,3] for each sequence
+            valid_lens = torch.repeat_interleave(valid_lens, shape[1])
         else:
-            #当valid_lens是二维时，为了避免维度不匹配，将其展开为一维，方便与输入张量X的维度相匹配
+            # If valid_lens is 2D, flatten it into a 1D tensor for easier matching with X's dimensions
             valid_lens = valid_lens.reshape(-1)
-    #X展平为(batch_size * seq_len, feature_size)形状,可以堪称批次数量（样本数）,序列数,每个序列的特征值数量
-    X = d2l.sequence_mask(X.reshape(-1,shape[-1]),valid_lens,value=-1e6)
-    return nn.functional.softmax(X.reshape(shape),dim=-1)
+
+    # Flatten X to the shape (batch_size * seq_len, feature_size) to apply the masking
+    # Apply the sequence mask to the input tensor X where the masked elements are set to a very large negative value
+    X = d2l.sequence_mask(X.reshape(-1, shape[-1]), valid_lens, value=-1e6)
+
+    # Apply the softmax function on the masked tensor and reshape it back to the original shape
+    return nn.functional.softmax(X.reshape(shape), dim=-1)
 ```
-####  <1>点积注意力
-这是多头注意力和自注意力的基础，常用于计算注意力权重
+####  <1>Dot-Product Attention
+This is the foundation of multi-head attention and self-attention, commonly used to compute attention weights.
 ```python
-#缩放点积注意力,计算效率高，适合在GPU上进行计算，广泛应用于transformer模型中
-#DotProductAttention,dropout,queries,keys,values,valid_lens,d,scores,attention_weights
+# Scaled Dot-Product Attention, which is computationally efficient and suitable for GPU computation, widely used in Transformer models.
+# DotProductAttention, dropout, queries, keys, values, valid_lens, d, scores, attention_weights
 class DotProductAttention(nn.Module):
     def __init__(self, dropout, **kwargs):
-        super(DotProductAttention,self).__init__(**kwargs)
-        self.dropout=nn.Dropout(dropout)
-    #valid_lens初始值设置为None
-    def forward(self,queries,keys,values,valid_lens=None):
-        #利用queries以及keys的特征数d(shape[-1])进行缩放
-        d = queries.shape[-1]
-        #在缩放点积注意力中，要求queries和keys的特征数相同,对应scores形状为(batch_size,query_size,kv_pair_size)
-        scores =torch.bmm(queries,keys.transpose(1,2))/math.sqrt(d)
-        self.attention_weights = masked_softmax(scores,valid_lens)
-        return torch.bmm(self.dropout(self.attention_weights),values)
-```
-#### <2>加性注意力
-```python
-class AddictiveAttention(nn.Module):
-    #super()传入当前类名，表示向上查询当前类的直接父类，self表示传递当前类的直接实例
-    def __init__(self, key_size,query_size,num_hiddens,dropout,**kwargs):
-        super(AddictiveAttention,self).__init__(**kwargs)
-        self.W_q = nn.Linear(query_size,num_hiddens,bias=False)
-        self.W_k = nn.Linear(key_size,num_hiddens,bias=False)
-        self.W_v = nn.Linear(num_hiddens,1,bias=False)
+        super(DotProductAttention, self).__init__(**kwargs)
         self.dropout = nn.Dropout(dropout)
-    def forward(self,queries,keys,values,valid_lens):
-        #对应的queries最后形状为(batch_size,query_size,(1),num_hiddens),keys形状为(batch_size,(1),kv_pair_size,num_hiddens),在features计算中
-        #为了便于广播，需要调整维度,最后得到的features形状为(batch_size,query_size,kv_pair_size,num_hiddens),注意key_size与value_size相同，pairsize
-        queries,keys = self.W_q(queries),self.W_k(keys)
-        features = queries.unsqueeze(2)+keys.unsqueeze(1)
-        features = torch.tanh(features)
-        #scores删除了最后一维num_hiddens,因此形状为(batch_size,query_size,kv_pair_size)
-        scores = self.W_v(features).squeeze(-1)
-        self.attention_weights = masked_softmax(scores,valid_lens)
-        #values形状为(batch_size,kv_pair_size,value_size),因此应用权重矩阵后为(batch_size,query_size,value_size)
-        #输出矩阵的每一行可以视为一个查询的上下文表示
-        return torch.bmm(self.dropout(self.attention_weights),values)
+
+    # valid_lens is set to None by default
+    def forward(self, queries, keys, values, valid_lens=None):
+        # Scaling using the feature dimension d of queries and keys
+        d = queries.shape[-1]
+        # In scaled dot-product attention, the feature dimension of queries and keys must be the same, resulting in scores shape (batch_size, query_size, kv_pair_size)
+        scores = torch.bmm(queries, keys.transpose(1, 2)) / math.sqrt(d)
+        self.attention_weights = masked_softmax(scores, valid_lens)
+        return torch.bmm(self.dropout(self.attention_weights), values)
 ```
-### （3）多头注意力
+#### <2>Additive Attention
 ```python
-#进行多头注意力模型建模
-#MultiHeadAttention,key_size,query_size,value_size,num_hiddens,num_heads,dropout,bias,attention,W_q,W_k,W_v,W,_o
+class AdditiveAttention(nn.Module):
+    # super() is used to query the direct parent class of the current class, and self represents the instance of the current class
+    def __init__(self, key_size, query_size, num_hiddens, dropout, **kwargs):
+        super(AdditiveAttention, self).__init__(**kwargs)
+        self.W_q = nn.Linear(query_size, num_hiddens, bias=False)
+        self.W_k = nn.Linear(key_size, num_hiddens, bias=False)
+        self.W_v = nn.Linear(num_hiddens, 1, bias=False)
+        self.dropout = nn.Dropout(dropout)
+
+    def forward(self, queries, keys, values, valid_lens):
+        # The shape of queries will be (batch_size, query_size, (1), num_hiddens), keys will be (batch_size, (1), kv_pair_size, num_hiddens)
+        # To facilitate broadcasting, we adjust the dimensions, and the final shape of features will be (batch_size, query_size, kv_pair_size, num_hiddens)
+        # Note: key_size and value_size are the same, and kv_pair_size refers to the pair size
+        queries, keys = self.W_q(queries), self.W_k(keys)
+        features = queries.unsqueeze(2) + keys.unsqueeze(1)
+        features = torch.tanh(features)
+        # The scores shape will be (batch_size, query_size, kv_pair_size) after removing the last dimension num_hiddens
+        scores = self.W_v(features).squeeze(-1)
+        self.attention_weights = masked_softmax(scores, valid_lens)
+        # The shape of values is (batch_size, kv_pair_size, value_size), and after applying the attention weights, the output shape will be (batch_size, query_size, value_size)
+        # Each row of the output matrix can be viewed as the context representation of a query
+        return torch.bmm(self.dropout(self.attention_weights), values)
+```
+### （3）Multihead Attention
+```python
+# Multi-Head Attention Model
+# MultiHeadAttention, key_size, query_size, value_size, num_hiddens, num_heads, dropout, bias, attention, W_q, W_k, W_v, W_o
 class MultiHeadAttention(nn.Module):
-    def __init__(self,key_size, query_size, value_size, num_hiddens, num_heads, dropout, bias = False,  **kwargs):
-        super(MultiHeadAttention,self).__init__(**kwargs)
+    def __init__(self, key_size, query_size, value_size, num_hiddens, num_heads, dropout, bias=False, **kwargs):
+        super(MultiHeadAttention, self).__init__(**kwargs)
         self.num_heads = num_heads
         self.attention = d2l.DotProductAttention(dropout)
-        self.W_q = nn.Linear(query_size,num_hiddens,bias = bias)
-        self.W_k = nn.Linear(key_size,num_hiddens,bias = bias)
-        self.W_v = nn.Linear(value_size,num_hiddens,bias = bias)
-        self.W_o = nn.Linear(num_hiddens,num_hiddens,bias = bias)
-    def forward(self,queries,keys,values,valid_lens):
-        queries = transpose_qkv(self.W_q(queries),self.num_heads)
-        keys = transpose_qkv(self.W_k(keys),self.num_heads)
-        values = transpose_qkv(self.W_v(values),self.num_heads)
+        self.W_q = nn.Linear(query_size, num_hiddens, bias=bias)
+        self.W_k = nn.Linear(key_size, num_hiddens, bias=bias)
+        self.W_v = nn.Linear(value_size, num_hiddens, bias=bias)
+        self.W_o = nn.Linear(num_hiddens, num_hiddens, bias=bias)
+
+    def forward(self, queries, keys, values, valid_lens):
+        queries = transpose_qkv(self.W_q(queries), self.num_heads)
+        keys = transpose_qkv(self.W_k(keys), self.num_heads)
+        values = transpose_qkv(self.W_v(values), self.num_heads)
         if valid_lens is not None:
-            valid_lens = torch.repeat_interleave(valid_lens,repeats=self.num_heads,dim=0)
-        output = self.attention(queries,keys,values,valid_lens)
-        output_concat = transpose_output(output,self.num_heads)
+            valid_lens = torch.repeat_interleave(valid_lens, repeats=self.num_heads, dim=0)
+        output = self.attention(queries, keys, values, valid_lens)
+        output_concat = transpose_output(output, self.num_heads)
         return self.W_o(output_concat)
 
-#为了多注意力的头进行矩阵形状转换
-#从输入X(batch_size,kv_pair_size,num_hiddens)->(batch_size,kv_pair_size,num_heads,num_hiddens/num_heads)
-#->(batch_size,num_heads,kv_pair_size,num_hiddens/num_heads)->(batch_size*num_heads,kv_pair_size,num_hiddens/num_heads)
-def transpose_qkv(X,num_heads):
-    X = X.reshape(X.shape[0],X.shape[1],num_heads,-1)
-    X = X.permute(0,2,1,3)
-    return X.reshape(-1,X.shape[2],X.shape[3])
-#恢复成原来的形状
-def transpose_output(X,num_heads):
-    X = X.reshape(-1,num_heads,X.shape[1],X.shape[2])
-    X = X.permute(0,2,1,3)
-    return X.reshape(X.shape[0],X.shape[1],-1)
+# To reshape the matrices for multiple attention heads
+# From input X(batch_size, kv_pair_size, num_hiddens) -> (batch_size, kv_pair_size, num_heads, num_hiddens/num_heads)
+# -> (batch_size, num_heads, kv_pair_size, num_hiddens/num_heads) -> (batch_size*num_heads, kv_pair_size, num_hiddens/num_heads)
+def transpose_qkv(X, num_heads):
+    X = X.reshape(X.shape[0], X.shape[1], num_heads, -1)
+    X = X.permute(0, 2, 1, 3)
+    return X.reshape(-1, X.shape[2], X.shape[3])
+
+# Restore to the original shape
+def transpose_output(X, num_heads):
+    X = X.reshape(-1, num_heads, X.shape[1], X.shape[2])
+    X = X.permute(0, 2, 1, 3)
+    return X.reshape(X.shape[0], X.shape[1], -1)
 ```
-### （4）自注意力
+### （4）self-attention
 ```python
-#自注意力机制本质上就是输入数据同时作为query,key,value，通过多头注意力模型寻找输入数据之间的相关性
+# The self-attention mechanism essentially uses the input data as query, key, and value, 
+# and the multi-head attention model is used to find correlations between the input data.
 num_hiddens, num_heads = 100, 5
-attention = MultiHeadAttention(num_hiddens,num_hiddens,num_hiddens,num_hiddens,num_heads,0.5)
-attention.eval()
-#batch_size,num_queries,num_kv_pairs,valid_lens,X,Y
+attention = MultiHeadAttention(num_hiddens, num_hiddens, num_hiddens, num_hiddens, num_heads, 0.5)
+attention.eval()  # Set the model to evaluation mode
+
+# batch_size, num_queries, num_kv_pairs, valid_lens, X, Y
 batch_size, num_queries = 2, 4
-valid_lens = torch.tensor([3,2])
-X = torch.ones((batch_size,num_queries,num_hiddens))
-attention(X,X,X,valid_lens).shape
+valid_lens = torch.tensor([3, 2])
+X = torch.ones((batch_size, num_queries, num_hiddens))
+
+# Get the shape of the output when passing X as the query, key, and value
+output_shape = attention(X, X, X, valid_lens).shape
 ```
-### （5）位置编码
+### （5）Position Encoding 
 ```python
-#位置编码，利用正弦以及余弦函数进行固定位置编码，分别针对偶数维度使用正弦函数，奇数维度使用余弦函数
-#PositionalEncoding,self,num_hiddens,dropout,maxlen,P,X,dtype
-class PositonalEncoding(nn.Module):
-    #不需要引入**kwargs，因为函数的计算方法以及计算函数都是固定的，也不需要引入动态参数或不确定的参数
-    def __init__(self, num_hiddens,dropout,max_len = 1000):
-        super(PositonalEncoding,self).__init__()
+# Positional Encoding, using sine and cosine functions for fixed position encoding. 
+# Sine function is used for even dimensions and cosine function for odd dimensions.
+# PositionalEncoding class, with attributes such as num_hiddens, dropout, max_len, P, X, dtype.
+class PositionalEncoding(nn.Module):
+    # No need to introduce **kwargs as the calculation method and the function are fixed,
+    # and there's no need for dynamic or uncertain parameters.
+    def __init__(self, num_hiddens, dropout, max_len=1000):
+        super(PositionalEncoding, self).__init__()
         self.dropout = nn.Dropout(dropout)
-        #torch.zeros()传入的是一个矩阵的形状
-        self.P = torch.zeros((1,max_len,num_hiddens))
-        #位置编码本质上就是将时间步或是序列位置的索引值(maxlen)映射到特征维度(num_hiddens)上
-        #通过不同频率的正弦和余弦函数，赋予模型在序列位置处理中的位置感知能力，以下是计算公式代码
-        X = torch.arange(max_len,dtype=torch.float32).reshape(-1,1)/torch.pow(10000,torch.arange(0,num_hiddens,2,dtype=torch.float32)/num_hiddens)
-        #P的形状为(1,num_steps,num_hiddens)
-        self.P[:,:,0::2] = torch.sin(X)
-        self.P[:,:,1::2] = torch.cos(X)
-    def forward(self,X):
-        #通过:X.shape[1]将P的第二维与X的第二维即num_steps进行对齐，其他维度自动广播，然后将P放置在与X相同的设备上(GPU&CPU),否则无法进行计算
-        X = X + self.P[:,:X.shape[1],:].to(X.device)
+        # torch.zeros() is used to create a matrix of zeros with the given shape.
+        self.P = torch.zeros((1, max_len, num_hiddens))
+        
+        # The positional encoding maps the time step or sequence index (max_len) 
+        # to feature dimensions (num_hiddens). Using sine and cosine functions of 
+        # different frequencies, we provide the model with positional awareness.
+        # The following is the formula implementation.
+        X = torch.arange(max_len, dtype=torch.float32).reshape(-1, 1) / torch.pow(10000, torch.arange(0, num_hiddens, 2, dtype=torch.float32) / num_hiddens)
+        
+        # self.P's shape is (1, num_steps, num_hiddens)
+        self.P[:, :, 0::2] = torch.sin(X)  # Even dimensions use sine
+        self.P[:, :, 1::2] = torch.cos(X)  # Odd dimensions use cosine
+    
+    def forward(self, X):
+        # Align the second dimension of P with the second dimension of X (num_steps) 
+        # using X.shape[1], the other dimensions are automatically broadcast.
+        # Then, place P on the same device as X (GPU/CPU), otherwise computation will fail.
+        X = X + self.P[:, :X.shape[1], :].to(X.device)
         return self.dropout(X)
 ```
-### （6）前馈网络
+### （6）Feedforward Neural Network
 ```python
-#建立基于位置的前馈网络，对输入的每个特征进行独立的映射，操作与位置无关，由两个全连接层以及一个激活层构成
-#PositionWiseFFN,ffn_num_input,ffn_num_hiddens,ffn_num_outputs,dense1,relu,dense2
+# Constructing a position-wise feedforward network, which independently maps each input feature without regard to its position. 
+# It consists of two fully connected layers and an activation layer.
+# PositionWiseFFN, ffn_num_input, ffn_num_hiddens, ffn_num_outputs, dense1, relu, dense2
 class PositionWiseFFN(nn.Module):
-    def __init__(self, ffn_num_input, ffn_num_hiddens, ffn_num_outputs,**kwargs):
-        super(PositionWiseFFN,self).__init__(**kwargs)
-        self.dense1 = nn.Linear(ffn_num_input,ffn_num_hiddens)
+    def __init__(self, ffn_num_input, ffn_num_hiddens, ffn_num_outputs, **kwargs):
+        super(PositionWiseFFN, self).__init__(**kwargs)
+        self.dense1 = nn.Linear(ffn_num_input, ffn_num_hiddens)
         self.relu = nn.ReLU()
         self.dense2 = nn.Linear(ffn_num_hiddens, ffn_num_outputs)
+
     def forward(self, X):
         return self.dense2(self.relu(self.dense1(X)))
 ```
-### （7）层规范化
+### （7）Layer Normalization
 ```python
-#传入前馈网络处理后的数据(需要进行随机丢神经元dropout)以及输入数据，进行残差连接后进行层规范化
-#AddNorm,normalized_shape,dropout
+# Pass the data processed by the feedforward network (with random dropout applied) along with the input data, 
+# and perform a residual connection followed by layer normalization.
+# AddNorm, normalized_shape, dropout
 class AddNorm(nn.Module):
     def __init__(self, normalized_shape, dropout, **kwargs):
-        super(AddNorm,self).__init__(**kwargs)
+        super(AddNorm, self).__init__(**kwargs)
         self.dropout = nn.Dropout(dropout)
         self.ln = nn.LayerNorm(normalized_shape)
-    #使用Addnorm的前向传播时，传入上一层输入X以及当前层输出Y
-    def forward(self, X, Y):
-        return self.ln(self.dropout(Y)+X)
-```
-### （8）编码器结构
-```python
-#构建transformer编码器模块，attention-> addnorm1-> ffn-> addnorm2  ,use_bias用于控制是否在层的计算中使用偏置项
-#EncoderBlock,key_size,query_size,value_size,num_hiddens,norm_shape,ffn_num_input,ffn_num_hiddens,num_heads,dropout,use_bias
-#attention,addnorm1,ffn,addnorm2,X,valid_lens,Y
-class EncoderBlock(nn.Module):
-    def __init__(self, key_size, query_size, value_size, num_hiddens, norm_shape, ffn_num_input, ffn_num_hiddens, num_heads, dropout, use_bias = False, **kwargs):
-        super(EncoderBlock,self).__init__(**kwargs)
-        self.attention = d2l.MultiHeadAttention(num_hiddens,num_heads,dropout,use_bias)
-        self.addnorm1 = AddNorm(norm_shape,dropout)
-        self.ffn = PositionWiseFFN(ffn_num_input,ffn_num_hiddens,num_hiddens)
-        self.addnorm2 = AddNorm(norm_shape,dropout)
-    def forward(self,X,valid_lens):
-        Y = self.addnorm1(X,self.attention(X, X, X, valid_lens))
-        return self.addnorm2(Y,self.ffn(Y))
 
-#构建transformer编码器，包括嵌入层->位置编码->num_layers个EncoderBlock模块
-#相较于编码器模块，初始化参数多了vocab_size，用于将词表映射到隐藏层(特征维度)，num_layers，用于堆叠transformer模块
-#TransformerEncoder,vocab_size,key_size,query_size,value_size,num_hiddens,norm_shape,ffn_num_input,ffn_num_hiddens,num_heads,num_layers,dropout,use_bias
-#num_hiddens,embedding,pos_encoding,blks,'block'
+    # In the forward pass of AddNorm, input X from the previous layer and output Y from the current layer are passed.
+    def forward(self, X, Y):
+        return self.ln(self.dropout(Y) + X)
+```
+### （8）Encoder Structure
+```python
+# Build the Transformer encoder block, with attention -> addnorm1 -> ffn -> addnorm2. 
+# use_bias controls whether to use bias terms in the layer computations.
+# EncoderBlock, key_size, query_size, value_size, num_hiddens, norm_shape, 
+# ffn_num_input, ffn_num_hiddens, num_heads, dropout, use_bias
+# attention, addnorm1, ffn, addnorm2, X, valid_lens, Y
+class EncoderBlock(nn.Module):
+    def __init__(self, key_size, query_size, value_size, num_hiddens, norm_shape, 
+                 ffn_num_input, ffn_num_hiddens, num_heads, dropout, use_bias=False, **kwargs):
+        super(EncoderBlock, self).__init__(**kwargs)
+        self.attention = d2l.MultiHeadAttention(num_hiddens, num_heads, dropout, use_bias)
+        self.addnorm1 = AddNorm(norm_shape, dropout)
+        self.ffn = PositionWiseFFN(ffn_num_input, ffn_num_hiddens, num_hiddens)
+        self.addnorm2 = AddNorm(norm_shape, dropout)
+
+    def forward(self, X, valid_lens):
+        Y = self.addnorm1(X, self.attention(X, X, X, valid_lens))
+        return self.addnorm2(Y, self.ffn(Y))
+
+# Build the Transformer encoder, which includes embedding layer -> positional encoding -> num_layers EncoderBlock modules.
+# Compared to the encoder block, it also initializes vocab_size to map the vocabulary to the hidden layer (feature dimension),
+# and num_layers to stack multiple Transformer blocks.
+# TransformerEncoder, vocab_size, key_size, query_size, value_size, num_hiddens, 
+# norm_shape, ffn_num_input, ffn_num_hiddens, num_heads, num_layers, dropout, use_bias
+# num_hiddens, embedding, pos_encoding, blks, 'block'
 class TransformerEncoder(d2l.Encoder):
-    def __init__(self,vocab_size, key_size, query_size, value_size, 
+    def __init__(self, vocab_size, key_size, query_size, value_size, 
                  num_hiddens, norm_shape, ffn_num_input, ffn_num_hiddens, 
-                 num_heads, num_layers, dropout, use_bias = False,**kwargs):
-        super(TransformerEncoder,self).__init__(**kwargs)
+                 num_heads, num_layers, dropout, use_bias=False, **kwargs):
+        super(TransformerEncoder, self).__init__(**kwargs)
         self.num_hiddens = num_hiddens
         self.embedding = nn.Embedding(vocab_size, num_hiddens)
-        self.pos_encoding = d2l.PositionalEncoding(num_hiddens,dropout)
+        self.pos_encoding = d2l.PositionalEncoding(num_hiddens, dropout)
         self.blks = nn.Sequential()
         for i in range(num_layers):
-            self.blks.add_module("block"+str(i),EncoderBlock(key_size, query_size, value_size, num_hiddens,
-                                                            norm_shape, ffn_num_input, ffn_num_hiddens, 
-                                                            num_heads, dropout, use_bias))
-    #X,attention_weights,blks,i,blk,
+            self.blks.add_module("block" + str(i), EncoderBlock(key_size, query_size, value_size, num_hiddens,
+                                                              norm_shape, ffn_num_input, ffn_num_hiddens, 
+                                                              num_heads, dropout, use_bias))
+
     def forward(self, X, valid_lens, *args):
-        X = self.pos_encoding(self.embedding(X)*math.sqrt(self.num_hiddens))
+        X = self.pos_encoding(self.embedding(X) * math.sqrt(self.num_hiddens))
         self.attention_weights = [None] * len(self.blks)
-        #由于blks容器中存放的是(索引'block x'以及对应模型的键值对)，所以要想同时获得索引和模型，需要用enumerate进行遍历
-        for i,blk in enumerate(self.blks):
-            X = blk(X,valid_lens)
-            #这个注意力权重的路径为blks->blk->d2l.MultiAttention->D2l.DotAttention->对应self.attention_weights
+        # Since the blocks container stores the (index 'block x' and corresponding model pairs),
+        # we use enumerate to iterate and obtain both the index and the model.
+        for i, blk in enumerate(self.blks):
+            X = blk(X, valid_lens)
+            # This attention weight path is: blks -> blk -> d2l.MultiAttention -> d2l.DotAttention -> corresponding self.attention_weights
             self.attention_weights[i] = blk.attention.attention.attention_weights
         return X
 ```
-### （9）解码器结构
+### （9）Decoder Structure
 ```python
-#构建解码器模块,注意训练阶段以及预推理阶段
-#DecoderBlock,key_size,query_size,value_size,num_hiddens,norm_shape,ffn_num_input,ffn_num_hiddens, num_heads,dropout, i,**kwargs
-#attention1, addnorm1, attrntion2, addnorm2, ffn, addnorm3
+# Construct the decoder module, note the training and inference stages
+# DecoderBlock: key_size, query_size, value_size, num_hiddens, norm_shape, ffn_num_input, ffn_num_hiddens, num_heads, dropout, i, **kwargs
+# attention1, addnorm1, attention2, addnorm2, ffn, addnorm3
 class DecoderBlock(nn.Module):
     def __init__(self, key_size, query_size, value_size, num_hiddens, norm_shape, ffn_num_input, ffn_num_hiddens, num_heads, dropout, i, **kwargs):
-        super(DecoderBlock,self).__init__(**kwargs)
+        super(DecoderBlock, self).__init__(**kwargs)
         self.i = i
         self.attention1 = d2l.MultiHeadAttention(num_hiddens, num_heads, dropout)
         self.addnorm1 = AddNorm(norm_shape, dropout)
@@ -489,72 +528,76 @@ class DecoderBlock(nn.Module):
         self.addnorm2 = AddNorm(norm_shape, dropout)
         self.ffn = PositionWiseFFN(ffn_num_input, ffn_num_hiddens, num_hiddens)
         self.addnorm3 = AddNorm(norm_shape, dropout)
-    #X, state, enc_outputs, enc_valid_lens, key_values, training, batch_size, num_steps, dec_valid_lens, X2, Y, Y2, Z
-    def forward(self, X, state):#返回值包括规范化后的输出以及包含编码器输出，编码器有效长度以及解码器当前以及历史输入数据
-        #利用保存当前解码器输入以及历史输出的隐状态state,来获取编码器输出(作为解码器输入)以及编码序列有效长度
+
+    # X, state, enc_outputs, enc_valid_lens, key_values, training, batch_size, num_steps, dec_valid_lens, X2, Y, Y2, Z
+    def forward(self, X, state):  # Returns the normalized output along with the encoder's output, valid lengths, and the current and historical inputs of the decoder
+        # Use the saved current decoder input and historical outputs in the state to obtain the encoder outputs (as decoder inputs) and the valid lengths of the encoded sequence
         enc_outputs, enc_valid_lens = state[0], state[1]
-        #state[2]实际上存放的是当前解码器输入块的历史输入信息，历史无数据，当前输入作为key_values,最后在传回state[2][self.i]
+        # state[2] stores the historical inputs of the current decoder block. If there's no history, use the current input as key_values, then pass it back to state[2][self.i]
         if state[2][self.i] is None:
             key_values = X
         else:
-            key_values = torch.cat((state[2][self.i],X), axis = 1)
-        #注意key_values是包括解码器输入X以及历史数据，因此进行多头注意力训练时，可以视作自注意力机制
+            key_values = torch.cat((state[2][self.i], X), axis=1)
+        # Note that key_values include both the current decoder input X and the historical data, so in multi-head attention, it can be viewed as self-attention
         state[2][self.i] = key_values
-        #根据是否处于训练状态，训练时，需要根据输入X的形状(batch_size, num_steps, num_hiddens)对解码器有效长度
+        # Depending on whether it's training, adjust the decoder's valid lengths based on the shape of input X (batch_size, num_steps, num_hiddens)
         if self.training:
             batch_size, num_steps, _ = X.shape
-            dec_valid_lens = torch.arange(1, num_steps+1, device=X.device).repeat(batch_size, 1)
+            dec_valid_lens = torch.arange(1, num_steps + 1, device=X.device).repeat(batch_size, 1)
         else:
             dec_valid_lens = None
-        #自注意力
+        # Self-attention
         X2 = self.attention1(X, key_values, key_values, dec_valid_lens)
         Y = self.addnorm1(X, X2)
-        #多头注意力,利用解码器输出(Y)以及编码器输入(enc_outputs)
+        # Multi-head attention: use decoder output (Y) and encoder input (enc_outputs)
         Y2 = self.attention2(Y, enc_outputs, enc_outputs, enc_valid_lens)
         Z = self.addnorm2(Y, Y2)
         return self.addnorm3(Z, self.ffn(Z)), state
 
-#解码器构建，结构为嵌入层-> 位置编码-> num_layers层decoder_blk(blks)->全连接层
-#TransformerDecoder, AttentionDecoder, vocab_size, query_size, value_size, num_hiddens, norm_shape, ffn_num_outputs,ffn_num_hiddens
-#num_heads, num_layers, dropout, **kwargs, embedding, pos_encoding, blks
+# Build the decoder structure: embedding layer -> positional encoding -> num_layers decoder_blk(blks) -> fully connected layer
+# TransformerDecoder, AttentionDecoder, vocab_size, query_size, value_size, num_hiddens, norm_shape, ffn_num_outputs, ffn_num_hiddens
+# num_heads, num_layers, dropout, **kwargs, embedding, pos_encoding, blks
 class TransformerDecoder(d2l.AttentionDecoder):
-    #不需要引入偏置项bias
-    def __init__(self,vocab_size, key_size, query_size, value_size, 
+    # Bias term is not needed
+    def __init__(self, vocab_size, key_size, query_size, value_size, 
                  num_hiddens, norm_shape, ffn_num_input, ffn_num_hiddens, 
                  num_heads, num_layers, dropout, **kwargs):
-        super(TransformerDecoder,self).__init__(**kwargs)
+        super(TransformerDecoder, self).__init__(**kwargs)
         self.num_hiddens = num_hiddens
         self.num_layers = num_layers
         self.embedding = nn.Embedding(vocab_size, num_hiddens)
-        self.pos_encoding = d2l.PositionalEncoding(num_hiddens,dropout)
+        self.pos_encoding = d2l.PositionalEncoding(num_hiddens, dropout)
         self.blks = nn.Sequential()
         for i in range(num_layers):
-            self.blks.add_module("block"+str(i),DecoderBlock(key_size, query_size, value_size, num_hiddens,
+            self.blks.add_module("block" + str(i), DecoderBlock(key_size, query_size, value_size, num_hiddens,
                                                             norm_shape, ffn_num_input, ffn_num_hiddens, 
                                                             num_heads, dropout, i))
-        self.dense = nn.Linear(num_hiddens,vocab_size)
-    #enc_outputs, enc_valid_lens, *args
+        self.dense = nn.Linear(num_hiddens, vocab_size)
+
+    # enc_outputs, enc_valid_lens, *args
     def init_state(self, enc_outputs, enc_valid_lens, *args):
         return [enc_outputs, enc_valid_lens, [None] * self.num_layers]
-    #X,attention_weights,blks,i,blk,
+
+    # X, attention_weights, blks, i, blk
     def forward(self, X, state):
-        X = self.pos_encoding(self.embedding(X)*math.sqrt(self.num_hiddens))
-        #注意力权重容器初始化，需要设置两组，一组用于存放自注意力权重，一组用于存放编码器解码器自注意力权重
+        X = self.pos_encoding(self.embedding(X) * math.sqrt(self.num_hiddens))
+        # Initialize the attention weight container, which needs two groups: one for storing self-attention weights and the other for encoder-decoder attention weights
         self._attention_weights = [[None] * len(self.blks) for _ in range(2)]
-        #由于blks容器中存放的是(索引'block x'以及对应模型的键值对)，所以要想同时获得索引和模型，需要用enumerate进行遍历
-        for i,blk in enumerate(self.blks):
+        # Since the blks container stores (index 'block x' and its corresponding model key-value pair), we use enumerate to traverse them simultaneously
+        for i, blk in enumerate(self.blks):
             X, state = blk(X, state)
-            #这个注意力权重的路径为blks->blk->d2l.MultiAttention->D2l.DotAttention->对应self.attention_weights
+            # The attention weight path is: blks -> blk -> d2l.MultiAttention -> d2l.DotAttention -> corresponding self.attention_weights
             self._attention_weights[0][i] = blk.attention1.attention.attention_weights
             self._attention_weights[1][i] = blk.attention2.attention.attention_weights
         return self.dense(X), state
+
     @property
     def attention_weights(self):
         return self._attention_weights
 ```
-### （10）模型参数初始化以及编码器解码器耦合
+### （10）Model Parameter Initialization and Encoder-Decoder Coupling
 ```python
-#进行模型参数初始化
+#Model Parameter Initialization
 num_hiddens, num_layers, dropout, batch_size, num_steps = 32, 2, 0.1, 64, 10  
 lr, num_epochs, device = 0.005, 200, d2l.try_gpu()
 ffn_num_input, ffn_num_hiddens, num_heads = 32, 64, 4
@@ -570,115 +613,115 @@ decoder = TransformerDecoder(len(tgt_vocab), key_size, query_size, value_size,
 net = d2l.EncoderDecoder(encoder, decoder)
 
 ```
-### （11）训练流程
-进行序列到序列训练，可以使用d2l封装好的训练模块d2l.train_seq2seq()
+### （11）Training Process
+To perform sequence-to-sequence training, you can use the pre-packaged training module d2l.train_seq2seq()
 ```python
 d2l.train_seq2seq(net, train_iter, lr, num_epochs, tgt_vocab, device)
 ```
-## 五.实验与结果分析 (Experiments and Results)
-### 1.检测实验设计
-#### (1)设计目的
-本实验利用d2l数据中心DATAHUB的'fra-eng'文本数据作为训练数据集，经过预处理载入设计好的transformer模型中进行训练，通过进行参数微调，观察损失函数变化曲线以及测试结果，确定超参数，最终实现可靠的翻译效果。本次翻译模型的设计目的是构建一个高效、准确的翻译工具，以解决跨语言交流，主要是英语法语翻译交流。通过结合目前较为流行的transformer模型，捕捉源语言间多层次，复杂的语义特征，还能生成流畅自然的目标语言翻译，满足使用者在多场景中进行翻译的需求。
-#### (2)测试代码
+## Chapter 5.Experiments and Results Analysis
+### 1.Detection Experiment Design
+#### (1)Design Objective
+In this experiment, the 'fra-eng' text dataset from the d2l Data Center DATAHUB is used as the training dataset. After preprocessing, it is loaded into the designed transformer model for training. By performing parameter fine-tuning, observing the loss function curve, and testing the results, we aim to determine the hyperparameters and ultimately achieve reliable translation performance. The purpose of this translation model design is to build an efficient and accurate translation tool to facilitate cross-lingual communication, particularly for English-French translation. By combining the currently popular transformer model, it captures the multi-level, complex semantic features between source languages and generates fluent and natural translations in the target language. This model meets the user's translation needs across various scenarios.
+#### (2)Test Code
 ```python
-#根据训练好的模型，选取英语法语句子进行测试，根据模型进行预测
-#如果传入的字符串中包含',需要用\表示这是字符串的一部分，而不是字符串结尾
+# Test the trained model by selecting English-French sentence pairs and predicting translations
+# If the input string contains a single quote, it should be escaped with \ to indicate it is part of the string, not the end of the string
 engs = ['go .', 'i lost .', 'he\'s calm .', 'I\'m home .']
 fras = ['va !', 'j\'ai perdu .', 'il est calme .', 'je suis chez moi .']
-for eng, fra in zip(engs,fras):
-    #利用d2l.predict_seq2seq来获取翻译结果以及解码器权重序列，然后打印翻译情况以及BELU结果，用于评估翻译效果，k=2表示参考两个词的组合的准确性
-    translation,dec_attention_weight_seq = d2l.predict_seq2seq(net,eng,src_vocab,tgt_vocab,num_steps,device,True)
-    print(f'{eng}=>{translation}, ',f'bleu {d2l.bleu(translation,fra,k=2):.3f}')
+for eng, fra in zip(engs, fras):
+    # Use d2l.predict_seq2seq to get the translation and decoder attention weight sequence, then print the translation and BLEU score for evaluation.
+    # k=2 indicates the accuracy of bigram combinations.
+    translation, dec_attention_weight_seq = d2l.predict_seq2seq(net, eng, src_vocab, tgt_vocab, num_steps, device, True)
+    print(f'{eng} => {translation}, ', f'bleu {d2l.bleu(translation, fra, k=2):.3f}')
 
-#获取编码器自注意力权重，并进行可视化
-#enc_attention_weights
-enc_attention_weights = torch.cat(net.encoder.attention_weights,0).reshape((num_layers, num_heads, -1, num_steps))
-d2l.show_heatmaps(enc_attention_weights.cpu(),xlabel='Key positions', ylabel='Query positions', titles=['Head %d'%i for i in range(1,5)],
+# Get the encoder self-attention weights and visualize them
+# enc_attention_weights
+enc_attention_weights = torch.cat(net.encoder.attention_weights, 0).reshape((num_layers, num_heads, -1, num_steps))
+d2l.show_heatmaps(enc_attention_weights.cpu(), xlabel='Key positions', ylabel='Query positions', titles=['Head %d' % i for i in range(1, 5)],
                   figsize=(7, 3.5))
 
-#分别获取解码器的自注意力权重以及编码-解码器注意力权重
-#dec_attention_weights_2d, step, dec_attention_weight_seq, attn, blk, head, dec_attention_weights_filled, dec_attention_weights
-#dec_self_attention_weights, dec_inter_attention_weights
+# Get both the decoder self-attention weights and the encoder-decoder attention weights
+# dec_attention_weights_2d, step, dec_attention_weight_seq, attn, blk, head, dec_attention_weights_filled, dec_attention_weights
+# dec_self_attention_weights, dec_inter_attention_weights
 dec_attention_weights_2d = [head[0].tolist() for step in dec_attention_weight_seq 
                             for attn in step 
                             for blk in attn 
                             for head in blk]
 dec_attention_weights_filled = torch.tensor(pd.DataFrame(dec_attention_weights_2d).fillna(0.0).values)
 dec_attention_weights = dec_attention_weights_filled.reshape((-1, 2, num_layers, num_heads, num_steps))
-#进行解包赋值，分别提取重排后第 0 维上的两个部分：dec_self_attention_weights: 自注意力权重。dec_inter_attention_weights: 交互注意力权重
+# Unpack and assign values, extracting the two parts along the 0th dimension: dec_self_attention_weights: self-attention weights. dec_inter_attention_weights: interaction attention weights
 dec_self_attention_weights, dec_inter_attention_weights = dec_attention_weights.permute(1, 2, 3, 0, 4)
-#绘制热力图
+# Plot the heatmaps
 d2l.show_heatmaps(dec_self_attention_weights, xlabel='Key positions', ylabel='Query positions', 
-                  titles=['head %d'%i for i in range(1,5)], figsize=(7.5, 3))
+                  titles=['head %d' % i for i in range(1, 5)], figsize=(7.5, 3))
 d2l.show_heatmaps(dec_inter_attention_weights, xlabel='Key positions', ylabel='Query positions', 
-                  titles=['head %d'%i for i in range(1,5)], figsize=(7.5, 3))
+                  titles=['head %d' % i for i in range(1, 5)], figsize=(7.5, 3))
 plot.show()
 ```
-### 2.结果分析
-#### (1).损失曲线
-损失函数反映了模型预测值与实际值之间的差距，当损失曲线下降的过慢或者出现振荡现象，可能是学习率过大或是过小，如果损失值突然增大或是停滞不前，可能是出现了梯度爆炸或者梯度消失，本词构建的模型在前馈网络中选用relu激活函数避免了梯度消失，在训练过程中通过使用Xavier初始化以及梯度裁剪(Gradient Clipping)来限制梯度的最大范数，避免梯度爆炸。由于transformer模型编码器和解码器中有num_layers个核心层，因此采用在各层的子层间通过残差连接（当前层输出y(x)与前一层输入x直接相加，见于Addnorm模块，用于残差连接和层规范化），从而避免了梯度爆炸
-- 通过训练模块d2l.train_seq2seq()中的animator模块，实时跟踪模型训练过程中损失函数的变化情况，并根据变化情况进行更新，绘制图像
-- 经过调整超参数，发现当学习率为0.005，训练批次为200时，观察transformer模型针对'fra-eng'训练数据集（d2l.load_data_nmt(batch_size,num_steps)中获取）的损失函数变化曲线，发现损失曲线随训练轮次稳定下降，下降速度逐步放缓，在0-50轮次中下降最快，50-100轮持续下降，中间略有起伏，之后基本保持稳定，最终收敛在0.025附近，趋于平稳，训练效果较好
+### 2.Results Analysis
+#### (1).Loss Curve
+The loss function reflects the gap between the model's predicted values and the actual values. When the loss curve decreases too slowly or oscillates, it may indicate that the learning rate is either too high or too low. If the loss value suddenly increases or stagnates, it may indicate issues such as gradient explosion or vanishing gradients. In the model constructed here, the ReLU activation function was chosen for the feedforward network to avoid vanishing gradients. During training, Xavier initialization and gradient clipping were used to limit the maximum gradient norm, thereby preventing gradient explosion. Since the transformer model has num_layers core layers in both the encoder and decoder, residual connections (where the output of the current layer y(x) is added directly to the input of the previous layer x, seen in the Addnorm module for residual connection and layer normalization) are used between sub-layers of each layer to avoid gradient explosion.
+- The animator module in the training function d2l.train_seq2seq() was used to track the change in the loss function during training in real time, and updates were made based on this change, with images being plotted.
+- After adjusting the hyperparameters, it was found that when the learning rate was set to 0.005 and the training batch size was 200, the loss curve for the transformer model on the 'fra-eng' training dataset (obtained from d2l.load_data_nmt(batch_size, num_steps)) showed a steady decline with each training epoch. The speed of the decline gradually slowed down: it dropped the most quickly between epochs 0-50, continued to decrease between epochs 50-100 with some fluctuations, and then stabilized, ultimately converging around 0.025, showing good training results.
 ![loss_function_curve](loss_function_curve.png)
-#### (2).注意力权重热力图
-- 注意力权重表示key序列和query序列中不同索引位置元素之间的相关性，由于transformer模型是以自注意力机制为核心，因此在编码器自注意力权重以及解码器自注意力权重中，权重热力图表示序列内部各元素之间的相关性，如果序列对自身的注意力权重较高，对角线上的值颜色较深，在非相临元素之间权重较高，表示位置之间存在较强的语义和上下文关联，例如文本中的主语和谓语，即便距离较远，中间有定语等成分分隔。同时，通过观察注意力权重热力图可以研究模型是否正确理解了全局上下文，是否存在局部关注和上下文缺失的现象
-- 通过不同head的注意力权重可以获得不同的语义信息，通过观察图像可以发现文本序列中不同部分元素之间的相关性，通过将注意力权重引用到value上，获取注意力值，在通过多头注意力进行汇聚，最终得到了全面的上下文特征表示
-- 编码器自注意力权重
+#### (2).Attention Weight Heatmaps
+- Attention weights represent the correlation between elements at different index positions in the key and query sequences. Since the transformer model is based on the self-attention mechanism, the attention weight heatmaps in the encoder and decoder reflect the correlation between elements within the sequence. If a sequence pays more attention to itself, the values on the diagonal will be darker. Higher weights between non-adjacent elements indicate strong semantic and contextual relationships between positions, such as between the subject and verb in a sentence, even if they are far apart and separated by modifiers. By observing the attention weight heatmaps, we can also analyze whether the model correctly understands the global context and whether there is local attention or missing context.
+- Different attention weights for different heads provide various semantic information. By examining the heatmaps, we can observe the relationships between different parts of the sequence. By applying the attention weights to the values and aggregating them through multi-head attention, the model eventually obtains a comprehensive representation of contextual features.
+- Encoder self-attention weights.
 
 ![encoder_attention_weights](encoder_attention_weights.png)
 
-- 解码器自注意力权重
+- Dncoder self-attention weights.
   
 ![decoder_self_attention_weights](decoder_self_attention_weights.png)
 
-- 编码器解码器注意力权重
+- Encoder-Decoder Attention Weights:
   
 ![decoder_self_attention_weights](decoder_inter_attention_weights.png)
-#### 3.测试结果展示(bleu)
-载入部分英文句子进行模型测试，并展示预测结果，通过机器翻译领域常用自动化评估指标BLEU进行评估(Bilingual Evaluation Understudy),该指标
-- 计算机器翻译生成的文本与一个或多个参考翻译文本之间的n-gram匹配程度
-- 通过对多个长度的n-gram进行加权平均，衡量翻译质量
-- 引入惩罚机制(brevity penalty,BP),避免模型通过简单的复制参考文本的短片段来获得高分
-  模型公式如下
+#### 3.Test Results Display (BLEU)
+Load some English sentences for model testing and display the prediction results. The evaluation is performed using the commonly used automatic metric in machine translation, BLEU (Bilingual Evaluation Understudy). This metric:
+- Calculates the n-gram match between the machine-generated translation and one or more reference translations.
+- Measures translation quality by taking the weighted average of n-gram matches across multiple lengths.
+- Introduces a penalty mechanism (Brevity Penalty, BP) to prevent the model from obtaining a high score by simply copying short segments of the reference text.
+  The formula for BLEU is as follows:
   
-#### BLEU 计算公式
+#### The BLEU (Bilingual Evaluation Understudy) score calculation formula
 
-1. **总体公式**：
+1. **The overall BLEU score formula**：
    
 $$
 \text{BLEU} = \text{BP} \cdot \exp\left(\sum_{n=1}^N w_n \cdot \log p_n\right)
 $$
 
-$ \text{BP} $
+: Brevity Penalty
 
-: Brevity Penalty（长度惩罚因子）。
+N: The highest order of n-grams (usually 4)
 
-N: 最大的 n-gram 长度。
+w_n: The weight for the nth n-gram precision，(usually 1/N)
 
-w_n: 第 n-gram 的权重，通常为 
-
-w_n = \frac{1}{N}$
-
-p_n : 第n-gram 的精确度，定义为：
+p_n : The precision of the nth n-gram:
 
   
 $$
-p_n = \frac{\text{匹配的 n-gram 个数}}{\text{生成翻译的 n-gram 总数}}
+p_n = \frac{\sum_{c \in C'} \text{count}(c)}{\sum_{c \in C} \text{count}(c)}
 $$
 
-2. **长度惩罚因子（BP）**：
+C ′is the set of n-grams in the reference translations.
+𝐶C is the set of n-grams in the candidate translation.
+count(𝑐)count(c) is the count of each n-gram 𝑐c in the respective set.
+2. **The length penalty factor（BP）**：
 
 $$
 \text{BP} =
 \begin{cases} 
-1 & \text{如果 } c > r \\
-\exp(1 - \frac{r}{c}) & \text{如果 } c \leq r
+1 & \text{if } c > r \\
+\exp(1 - \frac{r}{c}) & \text{if } c \leq r
 \end{cases}
 $$
 
-c: 生成翻译的长度（candidate length）。
+c: candidate length
 
-r: 参考翻译的长度（reference length）。
+r: reference length
 
 
 loss 0.029, 5164.5 tokens/sec on cuda:0
@@ -689,24 +732,22 @@ loss 0.029, 5164.5 tokens/sec on cuda:0
 |he's calm .=>il est calme .|  bleu 1.000|
 |I'm home .=>je suis chez moi .|  bleu 1.000|
 
-实验设计：简要描述你如何设计实验，包括数据集的选择、训练和评估方法。
-结果展示：展示模型的训练过程、评估指标（如准确率、F1 分数、损失函数等），并通过图表展示模型的表现。如果有与其他模型的比较，可以展示对比结果。
-模型优化：说明你如何优化模型，比如调整超参数、增加正则化、改变网络结构等，来提高性能。
-## 六.技术挑战以及个人思考 
-### .分词以及词元索引转化
-分词是NLP的重要基础，通过分词能够将长序列的字符串数据分割成单独的词元，从而为词元索引转化奠定基础，在词元索引转化中，关键是要维护一个词频表和基于词频表构建一个vocab模块，在模块内部对按照词频大小对词频表中的元素进行排序，基于更新后的有序词频表对self.idx_to_token进行填充，从而利用self.idx_to_token更新self.token_to_idx（self.token_to_idx[token]=len(self.idx_to_token)-1）,这个设计思路充分利用了词频表，使代码简洁高效
-### .训练过程中张量数据的格式转换
-规范化训练过程中的输入数据格式是非常重要的一个环节，直接决定了模型能否平稳运行，数据格式的转化历程可以大致分解为
-- 初始载入的文本，表现为一整块的字符串
-- 通过分词，词元索引转化后的序列,len(self.idx_to_token)的一维序列
-- 通过顺序分区之后的(batch_size,num_steps)其中每个元素取值都位于词汇表vocab中，因此vocab_size分别为len(src_vocab)和len(tgt_vocab),在导入模型中，映射到隐藏层，隐藏层单元数量为num_hiddens,vocab_size->embedding layer->hidden layer，以这样一个顺序进行特征提取，隐藏层的特征提取是将词汇表的低维离散特征编码成适合模型理解和处理的连续特征，可以帮助模型更好地学习语言之间的复杂关系
-- 从而可以载入transformer模型(batch_size,num_steps,num_hiddens)
-### .参数列表匹配
-在transformer模型中，query_size,key_size,value_size,num_hiddens在行业中大多设置为一致的形式，因此很多时候可以只用num_hiddens进行替代
-## 七.参考代码
-内部包括各模块的具体实现以及测试用例
-- [attention_cues](attention_cues.py) 注意力热力图绘制功能以及nadaraya_watson_regression核回归实现
-- [attention_scoring_function](attention_scoring_function.py) 注意力权重函数实现，包括加性注意力和点积注意力
-- [bahdanau_attention](bahdanau_attention.py) 是一种简单的序列到序列模型，设计了一个基于两个循环神经网络的编码器-解码器架构
-- [multi_and_self_attention](multi_and_self_attention.py) 多头注意力机制以及自注意力机制实现
-- [transformer](transformer.py) 模型实现
+## Chapter 6. Technical Challenges and Personal Reflections
+### .Tokenization and Token Index Mapping
+Tokenization is an essential step in NLP. It involves dividing long string sequences into individual tokens, which are then converted into token indices. This is crucial for building the vocabulary table. During token index conversion, the main challenge lies in maintaining a frequency table and constructing a vocab module based on it. Inside this module, the frequency table elements are sorted by their frequency. The updated frequency table is then used to fill self.idx_to_token, which in turn updates self.token_to_idx. This design is efficient and ensures that the token indices map correctly to the corresponding tokens in the vocabulary. By leveraging the frequency table, the approach simplifies and streamlines the code, making it efficient.
+### .Tensor Data Format Conversion During Training
+Normalizing the input data format during training is a key factor in ensuring the model operates smoothly. The process can be broken down as follows:
+- Initially, the text is loaded as a single string.
+- Through tokenization, the string is converted into a sequence of token indices, which forms a 1D sequence of length equal to len(self.idx_to_token).
+- After sequential partitioning, the dataset is structured into batches of size (batch_size, num_steps), where each element belongs to the vocabulary, i.e., the values are mapped to indices in src_vocab and tgt_vocab respectively.
+- In the model, these sequences are mapped to the hidden layer, with the hidden layer having num_hiddens units. The process is as follows: vocab_size -> embedding layer -> hidden layer. The hidden layer extracts features from the embeddings, converting the low-dimensional discrete features from the vocabulary into continuous features that are suitable for the model. This helps the model learn complex relationships between different languages.
+- This structured data is then fed into the transformer model as a (batch_size, num_steps, num_hiddens) tensor for further processing.
+### .Parameter Matching
+n the transformer model, parameters such as query_size, key_size, value_size, and num_hiddens are often set to the same value in the industry. In many cases, num_hiddens is used as a substitute for the other parameters to simplify the model configuration.
+## 七.Reference Code
+This section includes the specific implementations of various modules and test cases.
+- [attention_cues](attention_cues.py) Implements the functionality for drawing attention heatmaps and the Nadaraya-Watson kernel regression.
+- [attention_scoring_function](attention_scoring_function.py) Implements attention weight functions, including additive attention and dot-product attention.
+- [bahdanau_attention](bahdanau_attention.py) A simple sequence-to-sequence model designed with an encoder-decoder architecture based on two recurrent neural networks.
+- [multi_and_self_attention](multi_and_self_attention.py) Implements multi-head attention mechanism and self-attention mechanism.
+- [transformer](transformer.py) The implementation of the transformer model.
