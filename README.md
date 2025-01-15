@@ -1,6 +1,5 @@
 # Transformer
 This project is designed to explore the attention mechanism and how to build an transformer model. The transformer model consists of encoder and decoder block, multi-attention ,self-attention, position-coding is included as well. By collecting the Eng-France dataset online, and through training, I completed a model can be used in text translation.
-关键在项目问题以及解决方案，个人经历和贡献，理解和思考
 ## 一.介绍
 ### 1.项目背景
 - 本项目基于 PyTorch 框架，旨在构建一个高效的机器翻译模型。我们使用了 Transformer 模型对英语-法语文本数据集进行了训练，以实现从英文到法语的高质量翻译功能。在项目中，除了实现基础翻译功能外，还深入学习了 Transformer 模型的原理与实现，包括自注意力机制、位置编码、编码器-解码器结构等关键模块。
