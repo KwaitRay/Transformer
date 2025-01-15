@@ -633,7 +633,7 @@ plot.show()
 
 - 编码器解码器注意力权重
   
-![decoder_self_attention_weights](decoder_self_attention_weights.png)
+![decoder_self_attention_weights](decoder_inter_attention_weights.png)
 #### 3.测试结果展示(bleu)
 载入部分英文句子进行模型测试，并展示预测结果，通过机器翻译领域常用自动化评估指标BLEU进行评估(Bilingual Evaluation Understudy),该指标
 - 计算机器翻译生成的文本与一个或多个参考翻译文本之间的n-gram匹配程度
@@ -692,10 +692,16 @@ loss 0.029, 5164.5 tokens/sec on cuda:0
 实验设计：简要描述你如何设计实验，包括数据集的选择、训练和评估方法。
 结果展示：展示模型的训练过程、评估指标（如准确率、F1 分数、损失函数等），并通过图表展示模型的表现。如果有与其他模型的比较，可以展示对比结果。
 模型优化：说明你如何优化模型，比如调整超参数、增加正则化、改变网络结构等，来提高性能。
-## 六.技术挑战以及个人思考
+## 六.技术挑战以及个人思考 
 ### .分词以及词元索引转化
+分词是NLP的重要基础，通过分词能够将长序列的字符串数据分割成单独的词元，从而为词元索引转化奠定基础，在词元索引转化中，关键是要维护一个词频表和基于词频表构建一个vocab模块，在模块内部对按照词频大小对词频表中的元素进行排序，基于更新后的有序词频表对self.idx_to_token进行填充，从而利用self.idx_to_token更新self.token_to_idx（self.token_to_idx[token]=len(self.idx_to_token)-1）,这个设计思路充分利用了词频表，使代码简洁高效
 ### .训练过程中张量数据的格式转换
+规范化训练过程中的输入数据格式是非常重要的一个环节，直接决定了模型能否平稳运行，数据格式的转化历程可以大致分解为
+- 初始载入的文本，表现为一整块的字符串
+- 通过分词，词元索引转化后的序列,len(self.idx_to_token)的一维序列
+- 通过顺序分区之后的(batch_size,num_steps)其中每个元素取值都位于词汇表vocab中，因此vocab_size分别为len(src_vocab)和len(tgt_vocab),在导入模型中，映射到隐藏层，隐藏层单元数量为num_hiddens,vocab_size->embedding layer->hidden layer，以这样一个顺序进行特征提取，隐藏层的特征提取是将词汇表的低维离散特征编码成适合模型理解和处理的连续特征，可以帮助模型更好地学习语言之间的复杂关系
+- 从而可以载入transformer模型(batch_size,num_steps,num_hiddens)
 ### .参数列表匹配
-### .动态模块化
-### .模块化设计，封装技术细节
-
+在transformer模型中，query_size,key_size,value_size,num_hiddens在行业中大多设置为一致的形式，因此很多时候可以只用num_hiddens进行替代
+## 七.参考代码
+- [attention_cues](attention_cues.py) 注意力热力图绘制功能实现
