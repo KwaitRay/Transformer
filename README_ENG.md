@@ -66,7 +66,12 @@ os.environ["KMP_DUPLICATE_LIB_OK"] = 'TRUE'
 ```
 
 ### （2）训练数据集预处理
-训练数据集加载与预处理是模型数据的重要基础，在d2l库内部封装的d2l.load_data_nmt()的内部实现中，就包括了从最开始的连接d2l数据中心DATAHUB,获取训练文档'fra-eng'对应的url,检测本地是否存在相关文件，不存在就通过request模利用url发送http请求并响应，将数据集加载到本地，通过with-open打开，然后针对文本进行预处理，包括在前一位不为空的标点符号前添加空格，字母替换成小写，替换文本中的非破坏性空格等规范化操作，将处理后的文本序列进行分词(tokenize)，然后通过Vocab模块构建token_to_idx,idx_to_token的词元索引间转化表，这是将文本数据集数据规范化导入模型的关键操作。之后可以采用顺序分区，可以保留上下文之间的依赖关系，或是采用随机分区，提高模型泛化程。最后利用torch的utils模块，使用torch.utils.data.DataLoader来创建迭代器，具体实现可以参考d2l库对应源码，以下是读取和规范化处理的部分操作
+The training dataset loading and preprocessing is a critical foundation for the model's data. In the internal implementation of d2l.load_data_nmt() in the d2l library, it includes connecting to the d2l data center (DATAHUB) to retrieve the URL corresponding to the 'fra-eng' training document, checking whether the related files exist locally. If not, it sends an HTTP request using the URL through request and responds by downloading the dataset to the local machine. The dataset is then loaded using with open.
+
+Next, the text is preprocessed, which includes operations such as adding spaces before non-empty punctuation marks, converting letters to lowercase, and replacing non-breaking spaces with regular spaces for text normalization. After that, the text sequences are tokenized. Then, using the Vocab module, token-to-index and index-to-token mappings are built, which is a key operation for normalizing the text dataset before feeding it into the model.
+
+Afterward, sequential partitioning can be applied to preserve the contextual dependencies, or random partitioning can be used to enhance the model's generalization ability. Finally, using PyTorch's utils module, torch.utils.data.DataLoader is employed to create iterators. For specific implementation details, you can refer to the corresponding source code in the d2l library. Below is a part of the operations for reading and normalizing the data.
+
 ```python
 def read_data_nmt():
     """Load the English-French dataset.
@@ -91,61 +96,61 @@ def preprocess_nmt(text):
            for i, char in enumerate(text)]
     return ''.join(out)
 ```
-#### <1>分词
-分词是NLP任务中的关键操作，有以下几点优势
-- 通过将长序列字符串分解成多个独立的词元，提高计算机的处理效率
-- 通过将词作为文本分析的基本单元，便于模型捕捉各词之间的语义以及上下文关系
-- 大部分模型要求离散的输入，通过分词可以适应模型的输入形式，为后续词向量编码提供基础(vocab模块)
-- 是机器翻译，情感分析，搜索引擎，文本生成等项目的关键核心模块
-#### <2>vocab模块
-实际上就是词汇表管理模块，用于词汇映射和索引管理，是将词元(token)转化为计算机可以接受的索引值的关键部分，是NLP技术的基石，有以下几个核心功能
-- 维护一个词频统计表self._token_freq，底层实现是collections模块中的collections.Counter(),通过该词频统计表对词元进行统计，通过sort算法按照词频排序，然后便于生成有序的词元索引表
-- 利用self._token_freq对对idx_to_token列表（按索引顺序存储词元，以便将索引映射回具体词元）以及token_to_idx字典（按词元即键值，快速查找对应的索引)进行初始化，内部通过上述两个列表，字典内置词元索引转化机制，可以通过传入参数自动识别并进行格式转化
-#### <3>随机分区
-随机分区适合数据量大、上下文依赖弱的场景，如模型预训练和分布式大规模训练。
-#### <4>顺序分区
-顺序分区适合上下文依赖强、任务特定的场景，如语言翻译和时间序列预测。这两种分区方式目标都是将输入数据和训练数据划分为多个分区
-#### <5>迭代器加载
-通过将经过分词和索引转化后的数据集，逐行进行读取，每行的第一个元素就是对应英文原词，第二个元素是法语词汇，分别读取到不同数组中，并进行张量化，最后返回源词元张量数组(src_array)以及目标词元张量(tgt_array)，将上述两个张量以及有效长度valid_lens组合成一个四维张量(src_array,src_valid_lens,tgt_array,tgt_valid_lens),通过torch的util模块将该思维张量利用torch.utils.data.DataLoader来创建迭代器,最后在文本加载和预处理模块最后返回迭代器(data_iter)，源词表(src_vocab)，目标词表(tgt_vocab)
-### （3）多头注意力机制
-通过多头注意力机制，不同的头可能关注多样性的文本特征，如
-- 捕捉到文本序列中的短距离依赖，比如说形容词和名词之间的关系
-- 捕捉到文本序列中的长距离依赖，比如在定语复杂的情况下，距离较远的主语和谓语
-- 帮助模型理解语义信息，有的头可能专注于特定的句法和语义模式
-同时也可以提高模型的鲁棒性，在部分头注意力分布出问题时，其他头可以进行补充或是调整，隐空间中子投影矩阵​也有助于模型学习复杂的高维表达
-### （4）自注意力机制
-自注意力机制通过对每个元素分配权重，捕获元素之间的全局依赖关系
-- 自注意力同时将输入序列经过一定变换后作为计算注意力权重的查询，键，值，在训练过程中动态调整序列中各元素对自身以及序列中的其他元素的注意力权重，在本次英语-法语翻译项目中可以捕捉到句子中各成分之间的依赖关系
-- 消除了局部位置限制，不同于RNN,CNN只能逐步处理数据，当前数据只能感知到之前的历史数据，自注意力机制将序列中所有元素视为平等元素，可以同时关注序列中不同位置的元素，捕获长距离依赖，同时在位置编码的辅助下也不会丢失位置信息
-- 自注意机制根据每个元素与序列中其他元素的相似性程度，通过softmax归一化，动态调整权重，能够根据输入内容的上下文语义，聚焦于更相关的信息，提高决策的可靠程度
-### （5）位置编码
-- 位置编码解决了自注意力机制无法得到位置信息的问题，在保证自注意力机制能够进行全局依赖捕获的基础上，还能够提供相对位置信息或绝对位置信息，这样模型就可以根据位置信息来学习序列中元素的顺序，目前常采用正弦函数和余弦函数进行位置编码。
-- 绝对位置编码提供了元素的具体位置，而相对位置编码则关注元素之间的相对关系。
-### （6）前馈网络
-前馈网络一般设置在自注意力层之后，可以通过并行计算对序列中的每个元素进行非线性变换，增强了局部信息的转换能力，捕捉更加复杂的语义特征，从而得到更深层次的信息，具有多个优势
-- 前馈网络本质上就是有两个全连接层中加上一层非线性激活函数，常见的有RELU，将输入序列通过非线性变换转成输出序列，从而能够捕捉到输入数据中的复杂模式，使模型不止可以解决简单线性问题，还可以解决复杂问题
-- 通过并行计算，可以极大的提高模型的运算速度，具备更高的计算效率
-### （7）层规范化
-层规范化对每一层的数据进行标准化，改善模型训练过程的稳定性，加速收敛，提高模型性能
-- 层规范化对每一层的输入进行规范化，稳定均值和方差，避免梯度爆炸和梯度消失，从而改善模型训练过程的稳定性。同时通过标准化每一层的激活，缓解了由于参数不断更新带来的激活值过大或是过小的问题
-- 层规范化使每一层的输入分布更加稳定，从而使得神经网络的参数更新更加平稳，减少了训练过程中参数调整的波动，从而模型在较短时间内可以达到较好的性能，可以设置更大的学习率，加速收敛速度，不用担心参数变化过于剧烈以及梯度爆炸问题
-- 通过对每一层激活值进行标准化，减少了不同训练样本之间的差异，使得模型能够适应不同的输入，加速收敛
-### （8）编码器结构
-编码器外部是由嵌入层以及位置编码模块组成，内部是由num_layers个相同的层构成，每个层包括自注意力子层和基于位置的前馈网络子层，各子层之间通过残差网络和层规范化进行连接
-### （9）解码器结构
-解码器外部同样是由嵌入层以及位置编码模块组成，内部是由num_layers个相同的层构成，每个层在掩码自注意力子层和前馈网络子层之间还加上了一个编码器-解码器注意力子层，各子层之间通过残差网络和层规范化进行连接，最后通过一个全连接层nn.Linear(num_hiddens,tgt_vocab)返回到预测序列，得到源序列到预测序列的映射
-### （10）编码器解码器耦合
-d2l库提供了d2l.EncoderDecoder()模块，其中在初始化函数中同时对Encoder,Decoder模块进行初始化，在前向传播中，以encoder->decoder.init_state->decoder的流程进行传播，构建transformer模型
-### （11）训练流程
-进行序列到序列训练，训练流程可以分为
-- xavier初始化模型权重
-- 模型组件初始化，包括optimizer优化器(选用torch.Adam()优化器)，loss损失函数（选用MaskedSoftmaxLoss）
-- 设置模型为训练模式net.train()，自定义animator（用于追踪模型训练过程中的损失函数累计并绘制曲线）
-- 进行迭代训练。在每个轮次中设置timer(d2l.Timer)进行统计当前轮次训练时间，metric(d2l.Accumulator(2))计算每个轮次训练过程中模型的总损失和token数量
-- 构造一个由目标序列（Y）批次大小（Y.shape[0])个<bos>（即开始符号）构成的张量，作为解码器的初始输入，然后构造解码器的输入
-- 进行前向传播和损失计算（比较前向传播计算得到的预测值和真实标签之间的损失）
-- 计算损失并进行反向传播，确保损失是一个标量，然后进行梯度裁剪，更新模型参数，在不进行梯度更新的情况下进行损失累积和token累计
-- 最后每十个epoch对animator进行更新，更新损失图
+#### <1> Tokenize
+Tokenization is a key operation in NLP tasks, with the following advantages:
+- By breaking down long sequence strings into multiple independent tokens, it improves the processing efficiency for computers.
+- By treating words as the basic unit for text analysis, it allows the model to capture the semantics and contextual relationships between words.
+- Most models require discrete inputs, and tokenization can adapt to the input format of the model, providing a foundation for subsequent word vector encoding (via the Vocab module).
+- It is a critical core module for tasks such as machine translation, sentiment analysis, search engines, and text generation.
+#### <2> Vocab
+In essence, it is the vocabulary management module, used for vocabulary mapping and index management. It is a key part of NLP technology, transforming tokens into index values that computers can process, with several core functions:
+- Maintains a token frequency table, self._token_freq, implemented using the collections.Counter() module from Python's collections library. This token frequency table allows for the counting of tokens, sorting based on frequency, and facilitates the generation of an ordered token index table.
+- Initializes the idx_to_token list (which stores tokens in order of index, allowing for easy mapping from index to specific token) and the token_to_idx dictionary (which allows for quick lookup of index corresponding to each token) using the token frequency table (self._token_freq). Through these two lists and dictionaries, the internal transformation between token indices and actual tokens can be automatically handled.
+#### <3> Random Partition
+Random partition is suitable for scenarios with large datasets and weak context dependencies, such as model pretraining and large-scale distributed training.
+#### <4> Sequential Partition
+Sequential partition is suitable for scenarios with strong context dependencies and task-specific needs, such as language translation and time series prediction. Both partitioning methods aim to divide the input data and training data into multiple partitions.
+#### <5> Iterator Loading
+After tokenization and index conversion, the dataset is read line by line. The first element of each line corresponds to the English source word, and the second element is the French target word. These elements are stored in separate arrays and then tensorized. Finally, the source token tensor array (src_array) and the target token tensor (tgt_array) are returned, along with their respective valid lengths (valid_lens). These tensors, along with the valid lengths, are combined into a four-dimensional tensor (src_array, src_valid_lens, tgt_array, tgt_valid_lens). Using the torch.utils.data.DataLoader module, an iterator is created from this tensor. Finally, the iterator (data_iter), source vocabulary (src_vocab), and target vocabulary (tgt_vocab) are returned in the text loading and preprocessing module.
+### （3）Multi-Head Attention Mechanism
+Through the multi-head attention mechanism, different heads can focus on diverse text features, such as:
+- Capturing short-range dependencies in the text sequence, such as the relationship between adjectives and nouns.
+- Capturing long-range dependencies in the text sequence, such as the relationship between the subject and predicate when there is a complex modifier.
+- Helping the model understand semantic information, where some heads may focus on specific syntactic and semantic patterns.
+It also enhances the robustness of the model. When the attention distribution of some heads becomes problematic, other heads can complement or adjust it. The sub-projection matrices in the hidden space also help the model learn complex, high-dimensional representations.
+### （4）Self-Attention Mechanism
+The self-attention mechanism assigns weights to each element to capture global dependencies between elements:
+- Self-attention simultaneously uses the input sequence, after certain transformations, as the query, key, and value for calculating attention weights. During training, it dynamically adjusts the attention weights of each element in relation to itself and other elements in the sequence. In this English-to-French translation project, it captures the dependencies between different components of the sentence.
+- It eliminates local position constraints. Unlike RNNs and CNNs, which can only process data sequentially and where the current data can only perceive previous historical data, self-attention treats all elements in the sequence equally. It can simultaneously focus on elements at different positions in the sequence, capturing long-distance dependencies. With the help of position encoding, it does not lose position information.
+- The self-attention mechanism adjusts the weights dynamically based on the similarity between each element and other elements in the sequence. Through softmax normalization, it focuses on more relevant information based on the contextual semantics of the input, improving the reliability of decision-making.
+### （5）Position Encoding
+- Position encoding addresses the issue that the self-attention mechanism cannot capture position information. While allowing self-attention to capture global dependencies, it can also provide either relative or absolute position information. This enables the model to learn the order of elements in the sequence based on position information. Currently, sine and cosine functions are commonly used for position encoding.
+- Absolute position encoding provides the specific position of elements, while relative position encoding focuses on the relative relationships between elements.
+### （6）Feed-Forward Networks
+Feed-forward networks are typically placed after the self-attention layers and can perform nonlinear transformations on each element in the sequence through parallel computation. This enhances the ability to transform local information and capture more complex semantic features, thus obtaining deeper information. It has several advantages:
+- Essentially, a feed-forward network consists of two fully connected layers with a nonlinear activation function in between, commonly ReLU. It transforms the input sequence into an output sequence through nonlinear transformations, enabling the model to capture complex patterns in the input data. This allows the model to solve not only simple linear problems but also complex ones.
+- Parallel computation greatly increases the model's computational speed, offering higher computational efficiency.
+### （7）Layer Normalization
+Layer normalization normalizes the data for each layer, improving the stability of the model training process, accelerating convergence, and enhancing model performance:
+- Layer normalization normalizes the input for each layer, stabilizing the mean and variance to avoid gradient explosion and vanishing gradients, which improves the stability of the model training process. By normalizing the activation values of each layer, it mitigates the issue of excessively large or small activation values caused by continuous parameter updates.
+- Layer normalization makes the input distribution of each layer more stable, leading to smoother parameter updates in the neural network. This reduces fluctuations in parameter adjustments during training, allowing the model to achieve better performance in a shorter time. It also enables setting a larger learning rate, accelerating the convergence speed, without worrying about excessive parameter changes or gradient explosion issues.
+- By normalizing the activation values of each layer, layer normalization reduces the differences between training samples, enabling the model to adapt to different inputs and accelerate convergence.
+### （8）Encoder Structure
+The encoder consists externally of an embedding layer and a position encoding module. Internally, it is made up of num_layers identical layers, each of which includes a self-attention sub-layer and a position-based feedforward network sub-layer. The sub-layers are connected through residual networks and layer normalization.
+### （9）Decoder Structure
+The decoder consists externally of an embedding layer and a position encoding module. Internally, it is made up of num_layers identical layers. Each layer includes a masked self-attention sub-layer and a feedforward network sub-layer, with an additional encoder-decoder attention sub-layer placed between them. The sub-layers are connected through residual networks and layer normalization. Finally, a fully connected layer nn.Linear(num_hiddens, tgt_vocab) outputs the predicted sequence, mapping from the source sequence to the predicted sequence.
+### （10）Encoder-Decoder Coupling
+The d2l library provides the d2l.EncoderDecoder() module, which initializes both the Encoder and Decoder modules in the initialization function. During the forward pass, the propagation follows the flow: encoder -> decoder.init_state -> decoder, constructing the transformer model
+### （11）Training Process
+The sequence-to-sequence training process can be divided into the following steps:
+- Xavier initialization of model weights.
+- Initialization of model components, including the optimizer (using torch.Adam()) and the loss function (using MaskedSoftmaxLoss).）
+- Setting the model to training mode with net.train() and defining an animator (to track the accumulated loss during training and plot the loss curve).
+- Iterative training: In each iteration, a timer(d2l.Timer) is used to track the training time, and a metric(d2l.Accumulator(2)) is used to calculate the total loss and token count during each iteration.
+- Constructing a tensor consisting of the target sequence (Y) with a batch size of Y.shape[0], filled with <bos> (beginning-of-sequence token), as the initial input for the decoder, and then constructing the decoder input.
+- Performing forward propagation and loss calculation (comparing the predicted values from forward propagation with the true labels).
+- Calculating the loss, performing backpropagation to ensure the loss is a scalar, clipping the gradients, and updating model parameters. Loss accumulation and token accumulation are done without updating gradients.
+- Finally, updating the animator every ten epochs to plot the loss graph.
 ## 四.关键代码段实现
 ### （1）训练数据集预处理
 使用d2l库中封装好的函数d2l.load_data_nmt，内部实现主要包括链接到d2l数据中心DATA_HUB[]，返回所需文档的url,如果查询本地不存在该文件，利用流式传输下载到本地，然后进行解压，读取，预处理，包括替换文本中的非破坏性空格（'\u02f'和'\xa0'）,将所有字母替换为小写以及在前面没有空格的标点符号前插入空格，然后对文本进行分词，词元索引转化，利用torch.utils.data.DataLoade构建数据迭代器
