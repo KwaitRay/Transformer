@@ -708,6 +708,6 @@ loss 0.029, 5164.5 tokens/sec on cuda:0
 内部包括各模块的具体实现以及测试用例
 - [attention_cues](attention_cues.py) 注意力热力图绘制功能以及nadaraya_watson_regression核回归实现
 - [attention_scoring_function](attention_scoring_function.py) 注意力权重函数实现，包括加性注意力和点积注意力
-- [bahdanau_attention](bahdanau_attention.py) 实现，是一种简单的序列到序列模型，设计了一个基于两个循环神经网络的编码器-解码器架构
+- [bahdanau_attention](bahdanau_attention.py) 是一种简单的序列到序列模型，设计了一个基于两个循环神经网络的编码器-解码器架构
 - [multi_and_self_attention](multi_and_self_attention.py) 多头注意力机制以及自注意力机制实现
 - [transformer](transformer.py) 模型实现
