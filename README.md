@@ -61,16 +61,49 @@ os.environ["KMP_DUPLICATE_LIB_OK"] = 'TRUE'
 描述模块的设计动机、理论支撑和高层逻辑。
 示例：多头注意力机制为什么能够提升模型效果？
 ### （）训练数据集预处理
-#### <>文本加载
+训练数据集加载与预处理是模型数据的重要基础，在d2l库内部封装的d2l.load_data_nmt()的内部实现中，就包括了从最开始的连接d2l数据中心DATAHUB,获取训练文档'fra-eng'对应的url,检测本地是否存在相关文件，不存在就通过request模利用url发送http请求并响应，将数据集加载到本地，通过with-open打开，然后针对文本进行预处理，包括在前一位不为空的标点符号前添加空格，字母替换成小写，替换文本中的非破坏性空格等规范化操作，将处理后的文本序列进行分词(tokenize)，然后通过Vocab模块构建token_to_idx,idx_to_token的词元索引间转化表，这是将文本数据集数据规范化导入模型的关键操作。之后可以采用顺序分区，可以保留上下文之间的依赖关系，或是采用随机分区，提高模型泛化程。最后利用torch的utils模块，使用torch.utils.data.DataLoader来创建迭代器，具体实现可以参考d2l库对应源码，以下是读取和规范化处理的部分操作
+```python
+def read_data_nmt():
+    """Load the English-French dataset.
 
+    Defined in :numref:`sec_utils`"""
+    data_dir = d2l.download_extract('fra-eng')
+    with open(os.path.join(data_dir, 'fra.txt'), 'r', encoding='utf-8') as f:
+        return f.read()
+
+def preprocess_nmt(text):
+    """Preprocess the English-French dataset.
+
+    Defined in :numref:`sec_utils`"""
+    def no_space(char, prev_char):
+        return char in set(',.!?') and prev_char != ' '
+
+    # Replace non-breaking space with space, and convert uppercase letters to
+    # lowercase ones
+    text = text.replace('\u202f', ' ').replace('\xa0', ' ').lower()
+    # Insert space between words and punctuation marks
+    out = [' ' + char if i > 0 and no_space(char, text[i - 1]) else char
+           for i, char in enumerate(text)]
+    return ''.join(out)
+```
 #### <>分词
-
+分词是NLP任务中的关键操作，有以下几点优势
+- 通过将长序列字符串分解成多个独立的词元，提高计算机的处理效率
+- 通过将词作为文本分析的基本单元，便于模型捕捉各词之间的语义以及上下文关系
+- 大部分模型要求离散的输入，通过分词可以适应模型的输入形式，为后续词向量编码提供基础(vocab模块)
+- 是机器翻译，情感分析，搜索引擎，文本生成等项目的关键核心模块
 #### <>vocab模块
-
+实际上就是词汇表管理模块，用于词汇映射和索引管理，是将词元(token)转化为计算机可以接受的索引值的关键部分，是NLP技术的基石，有以下几个核心功能
+- 维护一个词频统计表self._token_freq，底层实现是collections模块中的collections.Counter(),通过该词频统计表对词元进行统计，通过sort算法按照词频排序，然后便于生成有序的词元索引表
+- 利用self._token_freq对对idx_to_token列表（按索引顺序存储词元，以便将索引映射回具体词元）以及token_to_idx字典（按词元即键值，快速查找对应的索引)进行初始化，内部通过上述两个列表，字典内置词元索引转化机制，可以通过传入参数自动识别并进行格式转化
 #### <>随机分区
+随机分区适合数据量大、上下文依赖弱的场景，如模型预训练和分布式大规模训练。
 #### <>顺序分区
+顺序分区适合上下文依赖强、任务特定的场景，如语言翻译和时间序列预测。这两种分区方式目标都是将输入数据和训练数据划分为多个分区
 #### <>迭代器加载
+通过将经过分词和索引转化后的数据集，逐行进行读取，每行的第一个元素就是对应英文原词，第二个元素是法语词汇，分别读取到不同数组中，并进行张量化，最后返回源词元张量数组(src_array)以及目标词元张量(tgt_array)，将上述两个张量以及有效长度valid_lens组合成一个四维张量(src_array,src_valid_lens,tgt_array,tgt_valid_lens),通过torch的util模块将该思维张量利用torch.utils.data.DataLoader来创建迭代器,最后在文本加载和预处理模块最后返回迭代器(data_iter)，源词表(src_vocab)，目标词表(tgt_vocab)
 ### （）多头注意力机制
+
 ### （）自注意力机制
 ### （）位置编码
 ### （）前馈网络
@@ -143,9 +176,18 @@ class Vocab:
     @property
     def token_freq(self):
         return self._token_freq
+
+#通过count_corpus()返回的是词元词频统计列表
+def count_corpus(tokens):
+    #如果tokens列表为空或tokens列表第一个元素是list,即tokens是二维列表，此时需要进行列表展开操作
+    if len(tokens)==0 or isinstance(tokens[0],list):
+        #tokens-line-token
+        tokens = [token for line in tokens for token in line]
+    return collections.Counter(tokens)
+
 ```
 #### <>随机分区
-```
+```python
 def seq_data_iter_random(corpus, batch_size, num_steps):  #@save
     #"""使用随机抽样生成一个小批量子序列"""
     # 从随机偏移量开始对序列进行分区，随机范围包括num_steps-1
