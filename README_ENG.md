@@ -1,38 +1,34 @@
 # Transformer
 This project is designed to explore the attention mechanism and how to build an transformer model. The transformer model consists of encoder and decoder block, multi-attention ,self-attention, position-coding is included as well. By collecting the Eng-France dataset online, and through training, I completed a model can be used in text translation.
-## 一.介绍
-### 1.项目背景
+## Chapter 1 Introduction
+### 1.Project Background
 - This project is based on the PyTorch framework and aims to build an efficient machine translation model. We used the Transformer model to train on an English-French text dataset to achieve high-quality translation from English to French. In this project, in addition to implementing the basic translation functionality, we also delved into the principles and implementation of the Transformer model, including key modules such as the self-attention mechanism, positional encoding, and the encoder-decoder structure.
-- Although the current project mainly focuses on learning and implementation, we have also explored some model optimization strategies, laying the foundation for future expansion into multilingual translation. Through this project, I have not only strengthened my understanding of deep learning frameworks but also gained practical experience in combining theory with practice, completing the entire process from data preprocessing to model training and evaluation. In the future, this project can be further applied to multilingual scenarios or enhanced with model fine-tuning to improve translation quality for specific domains.
-### 2.技术栈
-#### 编程语言：Python 3.10.16
-#### 深度学习框架：PyTorch. torch Version: 2.5.1+cu121
-#### 模型架构：Transformer。
-#### 辅助工具：Matplotlib 3.7.2（可视化）,NumPy 1.24.3（数组运算）,Pandas 2.0.3（数据集读取）
-#### 训练工具：GPU（CUDA 支持）。
-#### 代码管理：Git、VS Code。
-#### 评估与可视化：自定义的 Animator 类，show_heatmaps函数
-## 二.Transformer模型结构和原理
-### 1.模型结构
-- Transformer模型是基于注意力机制的深度学习模型，模型分成编码器和解码器两大模块，编码器模块由多个相同的层来组成，每个层都有两个子层。第一个子层是多头自注意力汇聚；第二个子层是基于位置的前馈网络。具体来说，在计算编码器的自注意力时，查询、键和值都来自前一个编码器层的输出。每个子层都采用了残差连接加法计算，然后再应用层规范化。
-
-- Transformer解码器也是由多个相同的层叠加而成的，并且层中使用了残差连接和层规范化。解码器层由三个子层构成，第一个子层是掩蔽多头自注意力层，该层的输入全都依赖于解码器的上一层，查询，键，值都来自上一个解码器层的输出。解码器中的每个位置只能考虑该位置之前的所有位置。这种掩蔽（masked）注意力保留了自回归（auto-regressive）属性，确保预测仅依赖于已生成的输出词元。掩蔽注意力的实现与RNN中的隐状态实现有相似之处，都在模块的前向传播函数中引入了隐状态state。第二个层是编码器－解码器注意力（encoder-decoder attention）层。在编码器－解码器注意力中，查询来自前一个解码器层的输出，而键和值来自整个编码器的输出。最后一个子层是一个基于位置的逐位前馈网络。
+- Through this project, you can strengthen your understanding of the deep learning framework Transformer and learned how to integrate theory with practice, completing the entire process from data preprocessing to model training and evaluation. In the future, this project can be further applied to multilingual scenarios or improved through model fine-tuning to enhance translation quality in specific domains.
+### 2.Technology Stack
+#### Programming Language：Python 3.10.16
+#### Deep Learning Framework：PyTorch. torch Version: 2.5.1+cu121
+#### Model Architecture：Transformer。
+#### Auxiliary Tools：Matplotlib 3.7.2（Visualization）,NumPy 1.24.3（Array Operation）,Pandas 2.0.3（Dataset Reading）
+#### Training Tools：GPU（CUDA Support）。
+#### Code Management：Git、VS Code。
+#### Evaluation and Visualization：Custom Animator Class，show_heatmap Function
+## 二.Transformer Model Architecture and Principles
+### 1.Model Architecture
+- The Transformer model is a deep learning architecture based on the attention mechanism, divided into two main modules: the encoder and the decoder. The encoder module consists of multiple identical layers, with each layer containing two sub-layers. The first sub-layer is multi-head self-attention aggregation, and the second sub-layer is a position-wise feed-forward network. Specifically, when calculating the self-attention in the encoder, the queries, keys, and values all come from the output of the previous encoder layer. Each sub-layer uses residual connections followed by layer normalization.
+- The Transformer decoder is also composed of multiple identical layers stacked together, and residual connections and layer normalization are used in each layer. The decoder layer consists of three sub-layers. The first sub-layer is a masked multi-head self-attention layer, where all inputs depend on the output of the previous decoder layer. Queries, keys, and values all come from the output of the previous decoder layer. In the decoder, each position can only attend to all positions before it. This masking attention retains the auto-regressive property, ensuring that predictions depend only on the previously generated output tokens. The implementation of masked attention is similar to the hidden state implementation in RNNs, where a hidden state is introduced in the forward pass of the module. The second sub-layer is the encoder-decoder attention layer. In encoder-decoder attention, the queries come from the output of the previous decoder layer, while the keys and values come from the entire output of the encoder. The final sub-layer is a position-wise feed-forward network.
   
 ![transformer_structure](transformer_structure.png)
-### 2.模型原理
-#### （1）自注意力机制(self-attention)
-  自注意力机制是Transformer的关键技术，实现上可以看作是将多头注意力中的查询，键，值都设置成相同张量，它允许模型在处理一个输入序列的每个元素时，能够关注到该序列中所有其他元素的信息。在传统的RNN中，信息是按时间步骤依赖的，而自注意力机制则通过计算每个词之间的相关性（即注意力权重），让模型更有效地捕获全局依赖。同时通过位置编码，使得transformer模型能够关注到输入序列的位置信息
+### 2.Model Principle
+#### （1）self-attention Mechanism
+  The self-attention mechanism is a key technology in the Transformer model. In terms of implementation, it can be seen as setting the queries, keys, and values in multi-head attention to the same tensor. It allows the model to focus on information from all other elements in the sequence when processing each element of the input sequence. In traditional RNNs, information is dependent on time steps, while self-attention calculates the relevance (i.e., attention weights) between each word, enabling the model to more effectively capture global dependencies. Additionally, position encoding allows the Transformer model to pay attention to the positional information of the input sequence.
   
-自注意力的计算过程：
-假设有一个输入序列，我们需要为每个词xi​计算与序列中其他词的关系：
-查询（Query）、键（Key）、值（Value）：
-通过对输入序列进行线性变换得到三个向量：查询Query，键Key，值Value. Q,K,V 的维度通常相同
-(query_size = key_size = query_size = num_hiddens)
+The computation process of self-attention: Assume there is an input sequence, and we need to calculate the relationship between each word xi and other words in the sequence.
+Query、Key、Value：
+By performing a linear transformation on the input sequence, three vectors are obtained: Query, Key, and Value. The dimensions of Q, K, and V are usually the same (query_size = key_size = value_size = num_hiddens).
 
-num_hiddens一般表示隐藏层单元数量，在transformer中num_hiddens大小一般根据输入序列特征数确定
+num_hiddens generally represents the number of hidden units, and in the Transformer model, the size of num_hiddens is typically determined based on the features of the input sequence.
 
-计算注意力权重：
-计算的是每个查询与所有键的相似度。使用查询和键计算相似度，常用的是点积计算：
+Calculating Attention Weights: The attention weights are computed based on the similarity between each query and all keys. The similarity between the query and the key is commonly calculated using dot product：
 
 $$
 \text{Attention}(Q, K, V) = \text{softmax}\left(\frac{QK^T}{\sqrt{d_k}}\right)V
