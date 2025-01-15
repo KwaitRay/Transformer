@@ -1,6 +1,6 @@
 # Transformer
 This project is designed to explore the attention mechanism and how to build an transformer model. The transformer model consists of encoder and decoder block, multi-attention ,self-attention, position-coding is included as well. By collecting the Eng-France dataset online, and through training, I completed a model can be used in text translation.
-## Chapter 1 Introduction
+## Chapter 1. Introduction
 ### 1.Project Background
 - This project is based on the PyTorch framework and aims to build an efficient machine translation model. We used the Transformer model to train on an English-French text dataset to achieve high-quality translation from English to French. In this project, in addition to implementing the basic translation functionality, we also delved into the principles and implementation of the Transformer model, including key modules such as the self-attention mechanism, positional encoding, and the encoder-decoder structure.
 - Through this project, you can strengthen your understanding of the deep learning framework Transformer and learned how to integrate theory with practice, completing the entire process from data preprocessing to model training and evaluation. In the future, this project can be further applied to multilingual scenarios or improved through model fine-tuning to enhance translation quality in specific domains.
@@ -12,7 +12,7 @@ This project is designed to explore the attention mechanism and how to build an 
 #### Training Tools：GPU（CUDA Support）。
 #### Code Management：Git、VS Code。
 #### Evaluation and Visualization：Custom Animator Class，show_heatmap Function
-## Chapter 2.Transformer Model Architecture and Principles
+## Chapter 2. Transformer Model Architecture and Principles
 ### 1.Model Architecture
 - The Transformer model is a deep learning architecture based on the attention mechanism, divided into two main modules: the encoder and the decoder. The encoder module consists of multiple identical layers, with each layer containing two sub-layers. The first sub-layer is multi-head self-attention aggregation, and the second sub-layer is a position-wise feed-forward network. Specifically, when calculating the self-attention in the encoder, the queries, keys, and values all come from the output of the previous encoder layer. Each sub-layer uses residual connections followed by layer normalization.
 - The Transformer decoder is also composed of multiple identical layers stacked together, and residual connections and layer normalization are used in each layer. The decoder layer consists of three sub-layers. The first sub-layer is a masked multi-head self-attention layer, where all inputs depend on the output of the previous decoder layer. Queries, keys, and values all come from the output of the previous decoder layer. In the decoder, each position can only attend to all positions before it. This masking attention retains the auto-regressive property, ensuring that predictions depend only on the previously generated output tokens. The implementation of masked attention is similar to the hidden state implementation in RNNs, where a hidden state is introduced in the forward pass of the module. The second sub-layer is the encoder-decoder attention layer. In encoder-decoder attention, the queries come from the output of the previous decoder layer, while the keys and values come from the entire output of the encoder. The final sub-layer is a position-wise feed-forward network.
@@ -50,7 +50,7 @@ $$
 
 #### （3）Positional Encoding
 Since transformers, unlike RNNs and CNNs, do not have inherent sequential processing capabilities, positional encoding is introduced. Positional encoding is a vector that has the same length as the input sequence and is added to the input embeddings. It helps the model capture the position of words in the sequence. In this project, positional encoding is generated using sine and cosine functions, thereby injecting absolute or relative positions.
-## Chapter 3.Technical Details
+## Chapter 3. Technical Details
 ### （1）Package Import
 ```python
 import random
@@ -151,7 +151,7 @@ The sequence-to-sequence training process can be divided into the following step
 - Performing forward propagation and loss calculation (comparing the predicted values from forward propagation with the true labels).
 - Calculating the loss, performing backpropagation to ensure the loss is a scalar, clipping the gradients, and updating model parameters. Loss accumulation and token accumulation are done without updating gradients.
 - Finally, updating the animator every ten epochs to plot the loss graph.
-## Chapter 4.Training Dataset Preprocessing
+## Chapter 4. Training Dataset Preprocessing
 ### （1）Training Dataset Preprocessing
 Using the function d2l.load_data_nmt from the d2l library, the internal implementation includes connecting to the d2l data center (DATA_HUB[]), retrieving the URL of the required document. If the file is not found locally, it will be streamed and downloaded to the local machine. Afterward, the file is decompressed, read, and preprocessed, which includes replacing non-breaking spaces (\u02f and \xa0) in the text, converting all letters to lowercase, and adding spaces before punctuation marks that do not have spaces in front. The text is then tokenized, and the tokens are indexed and converted into a form that can be used by the model. Finally, a data iterator is created using torch.utils.data.DataLoader.
 ```python
@@ -618,7 +618,7 @@ To perform sequence-to-sequence training, you can use the pre-packaged training 
 ```python
 d2l.train_seq2seq(net, train_iter, lr, num_epochs, tgt_vocab, device)
 ```
-## Chapter 5.Experiments and Results Analysis
+## Chapter 5. Experiments and Results Analysis
 ### 1.Detection Experiment Design
 #### (1)Design Objective
 In this experiment, the 'fra-eng' text dataset from the d2l Data Center DATAHUB is used as the training dataset. After preprocessing, it is loaded into the designed transformer model for training. By performing parameter fine-tuning, observing the loss function curve, and testing the results, we aim to determine the hyperparameters and ultimately achieve reliable translation performance. The purpose of this translation model design is to build an efficient and accurate translation tool to facilitate cross-lingual communication, particularly for English-French translation. By combining the currently popular transformer model, it captures the multi-level, complex semantic features between source languages and generates fluent and natural translations in the target language. This model meets the user's translation needs across various scenarios.
@@ -733,18 +733,18 @@ loss 0.029, 5164.5 tokens/sec on cuda:0
 |I'm home .=>je suis chez moi .|  bleu 1.000|
 
 ## Chapter 6. Technical Challenges and Personal Reflections
-### .Tokenization and Token Index Mapping
+### 1.Tokenization and Token Index Mapping
 Tokenization is an essential step in NLP. It involves dividing long string sequences into individual tokens, which are then converted into token indices. This is crucial for building the vocabulary table. During token index conversion, the main challenge lies in maintaining a frequency table and constructing a vocab module based on it. Inside this module, the frequency table elements are sorted by their frequency. The updated frequency table is then used to fill self.idx_to_token, which in turn updates self.token_to_idx. This design is efficient and ensures that the token indices map correctly to the corresponding tokens in the vocabulary. By leveraging the frequency table, the approach simplifies and streamlines the code, making it efficient.
-### .Tensor Data Format Conversion During Training
+### 2.Tensor Data Format Conversion During Training
 Normalizing the input data format during training is a key factor in ensuring the model operates smoothly. The process can be broken down as follows:
 - Initially, the text is loaded as a single string.
 - Through tokenization, the string is converted into a sequence of token indices, which forms a 1D sequence of length equal to len(self.idx_to_token).
 - After sequential partitioning, the dataset is structured into batches of size (batch_size, num_steps), where each element belongs to the vocabulary, i.e., the values are mapped to indices in src_vocab and tgt_vocab respectively.
 - In the model, these sequences are mapped to the hidden layer, with the hidden layer having num_hiddens units. The process is as follows: vocab_size -> embedding layer -> hidden layer. The hidden layer extracts features from the embeddings, converting the low-dimensional discrete features from the vocabulary into continuous features that are suitable for the model. This helps the model learn complex relationships between different languages.
 - This structured data is then fed into the transformer model as a (batch_size, num_steps, num_hiddens) tensor for further processing.
-### .Parameter Matching
+### 3.Parameter Matching
 n the transformer model, parameters such as query_size, key_size, value_size, and num_hiddens are often set to the same value in the industry. In many cases, num_hiddens is used as a substitute for the other parameters to simplify the model configuration.
-## 七.Reference Code
+## Chapter7. Reference Code
 This section includes the specific implementations of various modules and test cases.
 - [attention_cues](attention_cues.py) Implements the functionality for drawing attention heatmaps and the Nadaraya-Watson kernel regression.
 - [attention_scoring_function](attention_scoring_function.py) Implements attention weight functions, including additive attention and dot-product attention.
