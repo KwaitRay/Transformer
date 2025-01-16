@@ -55,7 +55,7 @@ $$
 #### （3）位置编码（Positional Encoding）
 由于transformer不像RNN,CNN具有顺序处理能力，因此引入了位置编码，位置编码是一个与输入序列长度相同的向量，它加入到输入嵌入（embedding）中，可以帮助模型捕捉词语在序列中的位置。本项目中通过正弦余弦函数生成位置编码，从而注入绝对或是相对位置
 ## 三.技术细节
-### （1）包导入
+### 1.包导入
 ```python
 import random
 import torch
@@ -68,7 +68,7 @@ import math
 import os
 os.environ["KMP_DUPLICATE_LIB_OK"] = 'TRUE'
 ```
-### （2）训练数据集预处理
+### 2.训练数据集预处理
 训练数据集加载与预处理是模型数据的重要基础，在d2l库内部封装的d2l.load_data_nmt()的内部实现中，就包括了从最开始的连接d2l数据中心DATAHUB,获取训练文档'fra-eng'对应的url,检测本地是否存在相关文件，不存在就通过request模利用url发送http请求并响应，将数据集加载到本地，通过with-open打开，然后针对文本进行预处理，包括在前一位不为空的标点符号前添加空格，字母替换成小写，替换文本中的非破坏性空格等规范化操作，将处理后的文本序列进行分词(tokenize)，然后通过Vocab模块构建token_to_idx,idx_to_token的词元索引间转化表，这是将文本数据集数据规范化导入模型的关键操作。之后可以采用顺序分区，可以保留上下文之间的依赖关系，或是采用随机分区，提高模型泛化程。最后利用torch的utils模块，使用torch.utils.data.DataLoader来创建迭代器，具体实现可以参考d2l库对应源码，以下是读取和规范化处理的部分操作
 ```python
 def read_data_nmt():
@@ -94,52 +94,52 @@ def preprocess_nmt(text):
            for i, char in enumerate(text)]
     return ''.join(out)
 ```
-#### <1>分词
+#### (1)分词
 分词是NLP任务中的关键操作，有以下几点优势
 - 通过将长序列字符串分解成多个独立的词元，提高计算机的处理效率
 - 通过将词作为文本分析的基本单元，便于模型捕捉各词之间的语义以及上下文关系
 - 大部分模型要求离散的输入，通过分词可以适应模型的输入形式，为后续词向量编码提供基础(vocab模块)
 - 是机器翻译，情感分析，搜索引擎，文本生成等项目的关键核心模块
-#### <2>vocab模块
+#### (2)vocab模块
 实际上就是词汇表管理模块，用于词汇映射和索引管理，是将词元(token)转化为计算机可以接受的索引值的关键部分，是NLP技术的基石，有以下几个核心功能
 - 维护一个词频统计表self._token_freq，底层实现是collections模块中的collections.Counter(),通过该词频统计表对词元进行统计，通过sort算法按照词频排序，然后便于生成有序的词元索引表
 - 利用self._token_freq对对idx_to_token列表（按索引顺序存储词元，以便将索引映射回具体词元）以及token_to_idx字典（按词元即键值，快速查找对应的索引)进行初始化，内部通过上述两个列表，字典内置词元索引转化机制，可以通过传入参数自动识别并进行格式转化
-#### <3>随机分区
+#### (3)随机分区
 随机分区适合数据量大、上下文依赖弱的场景，如模型预训练和分布式大规模训练。
-#### <4>顺序分区
+#### (4)顺序分区
 顺序分区适合上下文依赖强、任务特定的场景，如语言翻译和时间序列预测。这两种分区方式目标都是将输入数据和训练数据划分为多个分区
-#### <5>迭代器加载
+#### (5)迭代器加载
 通过将经过分词和索引转化后的数据集，逐行进行读取，每行的第一个元素就是对应英文原词，第二个元素是法语词汇，分别读取到不同数组中，并进行张量化，最后返回源词元张量数组(src_array)以及目标词元张量(tgt_array)，将上述两个张量以及有效长度valid_lens组合成一个四维张量(src_array,src_valid_lens,tgt_array,tgt_valid_lens),通过torch的util模块将该思维张量利用torch.utils.data.DataLoader来创建迭代器,最后在文本加载和预处理模块最后返回迭代器(data_iter)，源词表(src_vocab)，目标词表(tgt_vocab)
-### （3）多头注意力机制
+### 3.多头注意力机制
 通过多头注意力机制，不同的头可能关注多样性的文本特征，如
 - 捕捉到文本序列中的短距离依赖，比如说形容词和名词之间的关系
 - 捕捉到文本序列中的长距离依赖，比如在定语复杂的情况下，距离较远的主语和谓语
 - 帮助模型理解语义信息，有的头可能专注于特定的句法和语义模式
 同时也可以提高模型的鲁棒性，在部分头注意力分布出问题时，其他头可以进行补充或是调整，隐空间中子投影矩阵​也有助于模型学习复杂的高维表达
-### （4）自注意力机制
+### 4.自注意力机制
 自注意力机制通过对每个元素分配权重，捕获元素之间的全局依赖关系
 - 自注意力同时将输入序列经过一定变换后作为计算注意力权重的查询，键，值，在训练过程中动态调整序列中各元素对自身以及序列中的其他元素的注意力权重，在本次英语-法语翻译项目中可以捕捉到句子中各成分之间的依赖关系
 - 消除了局部位置限制，不同于RNN,CNN只能逐步处理数据，当前数据只能感知到之前的历史数据，自注意力机制将序列中所有元素视为平等元素，可以同时关注序列中不同位置的元素，捕获长距离依赖，同时在位置编码的辅助下也不会丢失位置信息
 - 自注意机制根据每个元素与序列中其他元素的相似性程度，通过softmax归一化，动态调整权重，能够根据输入内容的上下文语义，聚焦于更相关的信息，提高决策的可靠程度
-### （5）位置编码
+### 5.位置编码
 - 位置编码解决了自注意力机制无法得到位置信息的问题，在保证自注意力机制能够进行全局依赖捕获的基础上，还能够提供相对位置信息或绝对位置信息，这样模型就可以根据位置信息来学习序列中元素的顺序，目前常采用正弦函数和余弦函数进行位置编码。
 - 绝对位置编码提供了元素的具体位置，而相对位置编码则关注元素之间的相对关系。
-### （6）前馈网络
+### 6.前馈网络
 前馈网络一般设置在自注意力层之后，可以通过并行计算对序列中的每个元素进行非线性变换，增强了局部信息的转换能力，捕捉更加复杂的语义特征，从而得到更深层次的信息，具有多个优势
 - 前馈网络本质上就是有两个全连接层中加上一层非线性激活函数，常见的有RELU，将输入序列通过非线性变换转成输出序列，从而能够捕捉到输入数据中的复杂模式，使模型不止可以解决简单线性问题，还可以解决复杂问题
 - 通过并行计算，可以极大的提高模型的运算速度，具备更高的计算效率
-### （7）层规范化
+### 7.层规范化
 层规范化对每一层的数据进行标准化，改善模型训练过程的稳定性，加速收敛，提高模型性能
 - 层规范化对每一层的输入进行规范化，稳定均值和方差，避免梯度爆炸和梯度消失，从而改善模型训练过程的稳定性。同时通过标准化每一层的激活，缓解了由于参数不断更新带来的激活值过大或是过小的问题
 - 层规范化使每一层的输入分布更加稳定，从而使得神经网络的参数更新更加平稳，减少了训练过程中参数调整的波动，从而模型在较短时间内可以达到较好的性能，可以设置更大的学习率，加速收敛速度，不用担心参数变化过于剧烈以及梯度爆炸问题
 - 通过对每一层激活值进行标准化，减少了不同训练样本之间的差异，使得模型能够适应不同的输入，加速收敛
-### （8）编码器结构
+### 8.编码器结构
 编码器外部是由嵌入层以及位置编码模块组成，内部是由num_layers个相同的层构成，每个层包括自注意力子层和基于位置的前馈网络子层，各子层之间通过残差网络和层规范化进行连接
-### （9）解码器结构
+### 9.解码器结构
 解码器外部同样是由嵌入层以及位置编码模块组成，内部是由num_layers个相同的层构成，每个层在掩码自注意力子层和前馈网络子层之间还加上了一个编码器-解码器注意力子层，各子层之间通过残差网络和层规范化进行连接，最后通过一个全连接层nn.Linear(num_hiddens,tgt_vocab)返回到预测序列，得到源序列到预测序列的映射
-### （10）编码器解码器耦合
+### 10.编码器解码器耦合
 d2l库提供了d2l.EncoderDecoder()模块，其中在初始化函数中同时对Encoder,Decoder模块进行初始化，在前向传播中，以encoder->decoder.init_state->decoder的流程进行传播，构建transformer模型
-### （11）训练流程
+### 11.训练流程
 进行序列到序列训练，训练流程可以分为
 - xavier初始化模型权重
 - 模型组件初始化，包括optimizer优化器(选用torch.Adam()优化器)，loss损失函数（选用MaskedSoftmaxLoss）
@@ -150,13 +150,13 @@ d2l库提供了d2l.EncoderDecoder()模块，其中在初始化函数中同时对
 - 计算损失并进行反向传播，确保损失是一个标量，然后进行梯度裁剪，更新模型参数，在不进行梯度更新的情况下进行损失累积和token累计
 - 最后每十个epoch对animator进行更新，更新损失图
 ## 四.关键代码段实现
-### （1）训练数据集预处理
+### 1.训练数据集预处理
 使用d2l库中封装好的函数d2l.load_data_nmt，内部实现主要包括链接到d2l数据中心DATA_HUB[]，返回所需文档的url,如果查询本地不存在该文件，利用流式传输下载到本地，然后进行解压，读取，预处理，包括替换文本中的非破坏性空格（'\u02f'和'\xa0'）,将所有字母替换为小写以及在前面没有空格的标点符号前插入空格，然后对文本进行分词，词元索引转化，利用torch.utils.data.DataLoade构建数据迭代器
 ```python
 train_iter, src_vocab, tgt_vocab = d2l.load_data_nmt(batch_size,num_steps)
 ```
 以下是内部实现的关键代码
-#### <1>分词tokenize
+#### (1)分词tokenize
 ```python
 def tokenize(lines,token='word'):
     if token=='word':
@@ -166,7 +166,7 @@ def tokenize(lines,token='word'):
     else:
         print('错误，未知词元类型:'+token)
 ```
-#### <2>vocab模块
+#### (2)vocab模块
 ```python
 #将词元列表tokens转变为idx_to_token(初始索引-词元列表)，然后进一步转变为token_to_idx(词元-索引表)
 #利用collections.Counter(tokens)来得到_token_freqs列表，按照词频进行排序，降序排列
@@ -221,7 +221,7 @@ def count_corpus(tokens):
     return collections.Counter(tokens)
 
 ```
-#### <3>随机分区
+#### (3)随机分区
 ```python
 def seq_data_iter_random(corpus, batch_size, num_steps):  #@save
     #"""使用随机抽样生成一个小批量子序列"""
@@ -247,7 +247,7 @@ def seq_data_iter_random(corpus, batch_size, num_steps):  #@save
         Y = [data(j + 1) for j in initial_indices_per_batch]
         yield torch.tensor(X), torch.tensor(Y)
 ```
-#### <4>顺序分区
+#### (4)顺序分区
 ```python
 def seq_data_iter_sequential(corpus, batch_size, num_steps):  #@save
     #"""使用顺序分区生成一个小批量子序列"""
@@ -263,7 +263,7 @@ def seq_data_iter_sequential(corpus, batch_size, num_steps):  #@save
         Y = Ys[:, i: i + num_steps]
         yield X, Y
 ```
-#### <5>迭代器加载
+#### (5)迭代器加载
 ```python
 def load_array(data_arrays, batch_size, is_train=True):
     """Construct a PyTorch data iterator.
@@ -272,7 +272,7 @@ def load_array(data_arrays, batch_size, is_train=True):
     dataset = torch.utils.data.TensorDataset(*data_arrays)
     return torch.utils.data.DataLoader(dataset, batch_size, shuffle=is_train)
 ```
-### （2）注意力函数
+### 2.注意力函数
 计算点积注意力以及加性注意力需要提前定义好掩蔽softmax操作，用于将超过有效长度的元素用一个非常大的负值代替，避免影响后续计算，同时处理好有效长度valid_lens的转化
 ```python
 def masked_softmax(X,valid_lens):
@@ -291,7 +291,7 @@ def masked_softmax(X,valid_lens):
     X = d2l.sequence_mask(X.reshape(-1,shape[-1]),valid_lens,value=-1e6)
     return nn.functional.softmax(X.reshape(shape),dim=-1)
 ```
-####  <1>点积注意力
+####  (1)点积注意力
 这是多头注意力和自注意力的基础，常用于计算注意力权重
 ```python
 #缩放点积注意力,计算效率高，适合在GPU上进行计算，广泛应用于transformer模型中
@@ -309,7 +309,7 @@ class DotProductAttention(nn.Module):
         self.attention_weights = masked_softmax(scores,valid_lens)
         return torch.bmm(self.dropout(self.attention_weights),values)
 ```
-#### <2>加性注意力
+#### (2)加性注意力
 ```python
 class AddictiveAttention(nn.Module):
     #super()传入当前类名，表示向上查询当前类的直接父类，self表示传递当前类的直接实例
@@ -332,7 +332,7 @@ class AddictiveAttention(nn.Module):
         #输出矩阵的每一行可以视为一个查询的上下文表示
         return torch.bmm(self.dropout(self.attention_weights),values)
 ```
-### （3）多头注意力
+### 3.多头注意力
 ```python
 #进行多头注意力模型建模
 #MultiHeadAttention,key_size,query_size,value_size,num_hiddens,num_heads,dropout,bias,attention,W_q,W_k,W_v,W,_o
@@ -368,7 +368,7 @@ def transpose_output(X,num_heads):
     X = X.permute(0,2,1,3)
     return X.reshape(X.shape[0],X.shape[1],-1)
 ```
-### （4）自注意力
+### 4.自注意力
 ```python
 #自注意力机制本质上就是输入数据同时作为query,key,value，通过多头注意力模型寻找输入数据之间的相关性
 num_hiddens, num_heads = 100, 5
@@ -380,7 +380,7 @@ valid_lens = torch.tensor([3,2])
 X = torch.ones((batch_size,num_queries,num_hiddens))
 attention(X,X,X,valid_lens).shape
 ```
-### （5）位置编码
+### 5.位置编码
 ```python
 #位置编码，利用正弦以及余弦函数进行固定位置编码，分别针对偶数维度使用正弦函数，奇数维度使用余弦函数
 #PositionalEncoding,self,num_hiddens,dropout,maxlen,P,X,dtype
@@ -402,7 +402,7 @@ class PositonalEncoding(nn.Module):
         X = X + self.P[:,:X.shape[1],:].to(X.device)
         return self.dropout(X)
 ```
-### （6）前馈网络
+### 6.前馈网络
 ```python
 #建立基于位置的前馈网络，对输入的每个特征进行独立的映射，操作与位置无关，由两个全连接层以及一个激活层构成
 #PositionWiseFFN,ffn_num_input,ffn_num_hiddens,ffn_num_outputs,dense1,relu,dense2
@@ -415,7 +415,7 @@ class PositionWiseFFN(nn.Module):
     def forward(self, X):
         return self.dense2(self.relu(self.dense1(X)))
 ```
-### （7）层规范化
+### 7.层规范化
 ```python
 #传入前馈网络处理后的数据(需要进行随机丢神经元dropout)以及输入数据，进行残差连接后进行层规范化
 #AddNorm,normalized_shape,dropout
@@ -428,7 +428,7 @@ class AddNorm(nn.Module):
     def forward(self, X, Y):
         return self.ln(self.dropout(Y)+X)
 ```
-### （8）编码器结构
+### 8.编码器结构
 ```python
 #构建transformer编码器模块，attention-> addnorm1-> ffn-> addnorm2  ,use_bias用于控制是否在层的计算中使用偏置项
 #EncoderBlock,key_size,query_size,value_size,num_hiddens,norm_shape,ffn_num_input,ffn_num_hiddens,num_heads,dropout,use_bias
@@ -472,7 +472,7 @@ class TransformerEncoder(d2l.Encoder):
             self.attention_weights[i] = blk.attention.attention.attention_weights
         return X
 ```
-### （9）解码器结构
+### 9.解码器结构
 ```python
 #构建解码器模块,注意训练阶段以及预推理阶段
 #DecoderBlock,key_size,query_size,value_size,num_hiddens,norm_shape,ffn_num_input,ffn_num_hiddens, num_heads,dropout, i,**kwargs
@@ -550,7 +550,7 @@ class TransformerDecoder(d2l.AttentionDecoder):
     def attention_weights(self):
         return self._attention_weights
 ```
-### （10）模型参数初始化以及编码器解码器耦合
+### 10.模型参数初始化以及编码器解码器耦合
 ```python
 #进行模型参数初始化
 num_hiddens, num_layers, dropout, batch_size, num_steps = 32, 2, 0.1, 64, 10  
@@ -568,7 +568,7 @@ decoder = TransformerDecoder(len(tgt_vocab), key_size, query_size, value_size,
 net = d2l.EncoderDecoder(encoder, decoder)
 
 ```
-### （11）训练流程
+### 11.训练流程
 进行序列到序列训练，可以使用d2l封装好的训练模块d2l.train_seq2seq()
 ```python
 d2l.train_seq2seq(net, train_iter, lr, num_epochs, tgt_vocab, device)
