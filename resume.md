@@ -5,7 +5,10 @@
 🔗 LinkedIn: https://www.linkedin.com/in/时锋-陈-3a5ba8346
 💻 GitHub: http://github.com/KwaitRay
 
-EDUCATION
+**PROFESSIONAL SUMMARY**
+Motivated and detail-oriented software developer with a strong foundation in computer science and experience in machine learning, computer vision, and data analysis. 
+Proficient in C++, Python, with a track record of delivering innovative solutions in both academic and real-world projects. Passionate about leveraging AI to solve complex problems and improve user experience.
+**EDUCATION**
 University of Melbourne  Feb 2025 -now
 Master of Information Technology
 Relevant Courses: Machine Learning, Deep Learning, Computer Vision, Natural Language Processing
@@ -65,7 +68,22 @@ English Proficiency:
 IELTS (6.5, Speaking: 7)
 Proficient in reading and understanding technical English documents. Able to communicate effectively in English, with strong reading and comprehension skills, including participation in technical forums like StackOverflow and ServerFault.
 
-**PROFESSIONAL EXPERIENCE**
+**WORK EXPERIENCE**
+Software Engineer Intern – ABC Tech Co.
+06/2023 – 09/2023
+Collaborated on the development of a custom search engine, focusing on online module implementation.
+Established TCP connections between client and server, enabling real-time keyword recommendations and search result delivery.
+Optimized caching mechanisms with MySQL and MongoDB, reducing average query response time by 30%.
+Gained proficiency in Socket programming, multi-threading, and process communication on Linux.
+
+Machine Learning Intern – XYZ AI Lab
+03/2023 – 06/2023
+Trained and deployed a Transformer-based machine translation model using PyTorch.
+Preprocessed bilingual datasets with Pandas and visualized attention weights with Matplotlib.
+Conducted hyperparameter tuning and optimized GPU resource utilization, improving BLEU score by 15%.
+Successfully implemented self-attention and positional encoding modules to enhance translation quality.
+
+**PROJECT EXPERIENCE**
 2023.12 – 2024.03
 **Customized Content Search Engine**
 Situation:Designed a customized content search engine to handle efficient and accurate keyword-based searches, focusing on developing the online module while gaining insights into the offline framework.
