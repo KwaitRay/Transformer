@@ -67,16 +67,30 @@ Proficient in reading and understanding technical English documents. Able to com
 
 **PROFESSIONAL EXPERIENCE**
 2023.12 – 2024.03
-Customized Content Search Engine
-Project Description:
-Designed and implemented the online module of a search engine, including features such as keyword recommendation, caching system, and webpage query functionalities. Gained a foundational understanding of the offline module's framework, including dictionary construction and inverted index concepts. Established TCP connections to enable client-server communication through network programming.
-Technologies Used:
-TCP connections, caching system design
-Database:
-MySQL
-Achievements:
-Successfully built the online module, ensuring fast and accurate query processing.
-Optimized data handling and system performance through efficient caching mechanisms.
-Gained hands-on experience in multi-threading, TCP/IP networking, and Socket communication.
+**Customized Content Search Engine**
+Situation:Designed a customized content search engine to handle efficient and accurate keyword-based searches, focusing on developing the online module while gaining insights into the offline framework.
+Task:Develop key features for the online module, including keyword recommendation, caching system design, and client-server communication via network programming.
+Action:Established TCP connections for real-time client-server communication.
+Implemented caching mechanisms to improve system performance.
+Explored frameworks for dictionary and inverted index construction to enhance future scalability.
+Result:Successfully delivered an operational online module.
+Improved query response times and system reliability.
+Acquired hands-on expertise in multi-threading, Socket programming, and database operations with MySQL and MongoDB.
+
+
+**Machine Translation Model Based on Transformer**
+2023.06 – 2023.09
+Situation:Designed and implemented a machine translation model based on the Transformer architecture using the PyTorch framework. The project aimed to achieve high-quality English-to-French translation by leveraging a publicly available text dataset.
+Task:Develop a complete pipeline for data preprocessing, model training, and evaluation.
+Deepen the understanding of Transformer-based architectures, including self-attention mechanisms, positional encoding, and encoder-decoder structures.
+Action:Preprocessed large-scale bilingual datasets using Pandas for data cleaning and tokenization.
+Constructed and trained the Transformer model with PyTorch and optimized performance using GPU acceleration (CUDA).
+Implemented and fine-tuned critical modules such as multi-head attention, positional encoding, and scaled dot-product attention.
+Utilized Matplotlib and custom-built tools like the Animator class and show_heatmaps function to visualize training progress and attention weights.
+Managed the project efficiently using Git and developed in a collaborative environment with VS Code.
+Result:Successfully built a functional English-to-French translation system with high accuracy, meeting project expectations.
+Improved translation quality by refining data preprocessing and hyperparameter tuning, resulting in smoother translations with fewer grammatical errors.
+Gained hands-on expertise with PyTorch, Transformer models, and the end-to-end machine translation workflow.
+Prepared the model for future enhancements, including adaptation to multilingual datasets and domain-specific fine-tuning.
 
 
